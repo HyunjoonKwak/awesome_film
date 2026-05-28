@@ -9,6 +9,11 @@ coverage
 .tsbuildinfo
 *.tsbuildinfo
 
+# apps/desktop/build/ holds electron-builder asset inputs (icons, dmg
+# background) — these are source files, not generated output.
+!apps/desktop/build
+!apps/desktop/build/**
+
 .env
 .env.local
 .env.*.local
