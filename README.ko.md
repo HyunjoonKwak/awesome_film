@@ -134,11 +134,19 @@ workflow** 버튼. 현재 `apps/desktop/package.json` 의 version 값을 그대�
 사용합니다.
 
 `.dmg` 는 기본 미사이닝 상태로 생성됩니다(`electron-builder.yml` 의
-`identity: null`). 최종 사용자는 첫 실행 시 우클릭 → 열기를 해야 합니다.
-사이닝 + 공증된 `.dmg` 를 만들려면 Apple Developer Secret 5개 (`CSC_LINK`,
-`CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`,
-`APPLE_TEAM_ID`)를 리포지토리 Secrets 에 추가하고 `identity: null` 줄을
-제거하면 됩니다 — 워크플로 변경 불필요.
+`identity: null`). GitHub Release 에서 다운로드한 `.app` 은 macOS 가
+`com.apple.quarantine` 속성을 자동으로 붙여 **"…손상되었기 때문에 열 수
+없습니다"** 라는 거짓 메시지를 띄웁니다 — 우클릭 → 열기로도 우회되지
+않습니다. 첫 실행 전에 속성을 제거해야 합니다:
+
+```bash
+xattr -cr /Applications/cut_editor.app
+```
+
+별도 안내 없이 바로 열리는 사이닝 + 공증된 `.dmg` 를 만들려면 Apple
+Developer Secret 5개 (`CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`,
+`APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`)를 리포지토리 Secrets 에
+추가하고 `identity: null` 줄을 제거하면 됩니다 — 워크플로 변경 불필요.
 
 ## 로드맵 (v0.1 이후)
 

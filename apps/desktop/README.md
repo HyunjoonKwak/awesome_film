@@ -57,9 +57,16 @@ packaging if you want offline-from-first-launch transcription.
 
 Hardened runtime is on by default in `electron-builder.yml`.
 
-**Unsigned build (default)** — runs out of the box. The `.app` works for
-local testing but Gatekeeper blocks it on other machines. Users can still
-launch it via right-click → Open the first time.
+**Unsigned build (default)** — runs out of the box. A locally-built `.app`
+opens directly on the same machine (no quarantine attribute). When users
+download it from a GitHub Release, macOS attaches
+`com.apple.quarantine` and shows a misleading **"…is damaged and can't be
+opened"** dialog that right-click → Open won't bypass. They (or you) have
+to strip it once:
+
+```bash
+xattr -cr /Applications/cut_editor.app
+```
 
 ```yaml
 # electron-builder.yml currently ships with:

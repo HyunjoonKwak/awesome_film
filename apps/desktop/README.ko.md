@@ -68,8 +68,17 @@ pnpm --filter @cut/desktop build:mac
 ```
 
 electron-builder가 자동으로 이 변수들을 읽어 사이닝하고 결과 `.dmg`에
-`notarytool` 공증을 적용합니다. 변수 없이 빌드하면 미사이닝 번들이 생성되며
-macOS Gatekeeper가 차단합니다(로컬 테스트는 가능, 배포 부적합).
+`notarytool` 공증을 적용합니다.
+
+변수 없이 빌드하면 미사이닝 번들이 생성됩니다. 로컬에서 빌드한 `.app` 은
+같은 머신에서 바로 열리지만, GitHub Release 에서 다운로드한 경우 macOS 가
+`com.apple.quarantine` 속성을 붙여 **"…손상되었기 때문에 열 수
+없습니다"** 라는 거짓 메시지를 띄웁니다(우클릭 → 열기로도 우회 안 됨).
+첫 실행 전에 속성을 제거해야 합니다:
+
+```bash
+xattr -cr /Applications/cut_editor.app
+```
 
 ## GitHub Actions로 릴리스
 

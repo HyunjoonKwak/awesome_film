@@ -136,9 +136,18 @@ auto-updater can find them.
 **Ad-hoc build** — open the GitHub repo → **Actions** → **Release** →
 **Run workflow**. Uses the current `apps/desktop/package.json` version.
 
-Builds are unsigned by default (`identity: null` in `electron-builder.yml`);
-end users have to right-click → Open the first time. To ship a signed +
-notarised `.dmg`, add the Apple Developer secrets to the repo (`CSC_LINK`,
+Builds are unsigned by default (`identity: null` in `electron-builder.yml`).
+After downloading from a GitHub Release, macOS attaches a
+`com.apple.quarantine` attribute and shows a misleading **"…is damaged and
+can't be opened"** dialog — right-click → Open won't bypass it. Users (or
+you) need to strip the attribute once:
+
+```bash
+xattr -cr /Applications/cut_editor.app
+```
+
+To ship a properly signed + notarised `.dmg` that opens with no prompts at
+all, add the Apple Developer secrets to the repo (`CSC_LINK`,
 `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`,
 `APPLE_TEAM_ID`) and remove the `identity: null` line — no workflow change
 required.
