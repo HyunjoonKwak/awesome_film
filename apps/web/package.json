@@ -1,0 +1,50 @@
+{
+  "name": "@cut/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --turbopack -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "lint": "biome lint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "format": "biome format --write src",
+    "knip": "pnpm --filter '@cut/web' exec knip"
+  },
+  "dependencies": {
+    "@cut/core": "workspace:*",
+    "@huggingface/transformers": "^4.2.0",
+    "@mediapipe/tasks-vision": "^0.10.35",
+    "@radix-ui/react-context-menu": "^2.2.16",
+    "@radix-ui/react-dialog": "^1.1.2",
+    "clsx": "^2.1.1",
+    "dexie": "^4.0.10",
+    "lucide-react": "^0.460.0",
+    "mp4-muxer": "^5.2.2",
+    "mp4box": "^2.3.0",
+    "next": "^15.0.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "sonner": "^1.7.0",
+    "tailwind-merge": "^2.5.4",
+    "y-indexeddb": "^9.0.12",
+    "y-protocols": "^1.0.7",
+    "y-websocket": "^3.0.0",
+    "yjs": "^13.6.30",
+    "zod": "^3.23.8",
+    "zustand": "^5.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.3",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.5"
+  }
+}

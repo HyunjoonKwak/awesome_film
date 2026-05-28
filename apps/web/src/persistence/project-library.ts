@@ -1,0 +1,68 @@
+// Multi-project library backed by IndexedDB. Each project is keyed by its
+// stable id; the active project id is stored alongside so the editor can
+// re-open the last project automatically. Yjs continues to hold the live
+// canonical state for the *active* project; this store is for the "open
+// previous projects" experience.
+
+import Dexie, { type Table } from "dexie";
+import type { Project } from "@cut/core";
+
+interface StoredProject {
+  id: string;
+  name: string;
+  updatedAt: number;
+  json: string;        // serialized Project to avoid Dexie struct quirks
+}
+
+interface MetaRow {
+  key: string;
+  value: string;
+}
+
+class CutLibraryDB extends Dexie {
+  projects!: Table<StoredProject, string>;
+  meta!: Table<MetaRow, string>;
+  constructor() {
+    super("cut_editor.library.v1");
+    this.version(1).stores({
+      projects: "id, updatedAt, name",
+      meta: "key",
+    });
+  }
+}
+
+let db: CutLibraryDB | null = null;
+const getDb = () => {
+  if (!db) db = new CutLibraryDB();
+  return db;
+};
+
+export const listProjectsLibrary = async (): Promise<readonly StoredProject[]> =>
+  getDb().projects.orderBy("updatedAt").reverse().toArray();
+
+export const upsertProject = async (p: Project): Promise<void> => {
+  await getDb().projects.put({
+    id: p.id,
+    name: p.name,
+    updatedAt: p.updatedAt,
+    json: JSON.stringify(p),
+  });
+};
+
+export const getProject = async (id: string): Promise<Project | null> => {
+  const row = await getDb().projects.get(id);
+  return row ? (JSON.parse(row.json) as Project) : null;
+};
+
+export const deleteStoredProject = async (id: string): Promise<void> => {
+  await getDb().projects.delete(id);
+};
+
+export const setActiveProjectId = async (id: string): Promise<void> => {
+  await getDb().meta.put({ key: "activeProjectId", value: id });
+};
+
+export const getActiveProjectId = async (): Promise<string | null> => {
+  const row = await getDb().meta.get("activeProjectId");
+  return row?.value ?? null;
+};

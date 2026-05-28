@@ -1,0 +1,21 @@
+node_modules
+.pnpm-store
+.next
+out
+dist
+build
+coverage
+.turbo
+.tsbuildinfo
+*.tsbuildinfo
+
+.env
+.env.local
+.env.*.local
+
+.DS_Store
+*.log
+.playwright-mcp/
+
+# OpenCut clone used as study reference only
+reference/
