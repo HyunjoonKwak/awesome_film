@@ -106,6 +106,40 @@ pnpm --filter @cut/web prebundle:whisper
 gitignore되어 있으므로 새로운 체크아웃마다 또는 데스크톱 빌드 파이프라인 안에서
 재실행하세요.
 
+## 릴리스 빌드
+
+릴리스 빌드는 매 push가 아니라 수동 트리거로만 동작합니다. 워크플로 정의는
+[`.github/workflows/release.yml`](.github/workflows/release.yml)에 있습니다.
+
+**태그 릴리스 (권장)**
+
+```bash
+# 1. apps/desktop/package.json 의 version 을 올립니다 (예: 0.1.0 → 0.1.1).
+#    이어서 push 할 태그와 같은 숫자여야 합니다.
+
+# 2. 버전 변경을 커밋.
+git commit -am "chore: bump desktop to 0.1.1"
+git push
+
+# 3. 태그 push — 이 시점에 워크플로가 발화합니다.
+git tag v0.1.1
+git push --tags
+```
+
+약 15분 후 동일 이름의 GitHub Release 에 `.dmg` 두 개(`-arm64` / Intel)와
+`latest-mac.yml` 이 함께 업로드됩니다(자동 업데이터가 같은 경로를 봅니다).
+
+**임시 빌드** — GitHub 리포지토리 → **Actions** → **Release** → **Run
+workflow** 버튼. 현재 `apps/desktop/package.json` 의 version 값을 그대로
+사용합니다.
+
+`.dmg` 는 기본 미사이닝 상태로 생성됩니다(`electron-builder.yml` 의
+`identity: null`). 최종 사용자는 첫 실행 시 우클릭 → 열기를 해야 합니다.
+사이닝 + 공증된 `.dmg` 를 만들려면 Apple Developer Secret 5개 (`CSC_LINK`,
+`CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`,
+`APPLE_TEAM_ID`)를 리포지토리 Secrets 에 추가하고 `identity: null` 줄을
+제거하면 됩니다 — 워크플로 변경 불필요.
+
 ## 로드맵 (v0.1 이후)
 
 - WebGPU 렌더러 (wgsl 셰이더, 플러그인 SDK v2)

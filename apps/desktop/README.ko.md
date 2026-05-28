@@ -71,10 +71,26 @@ electron-builder가 자동으로 이 변수들을 읽어 사이닝하고 결과 
 `notarytool` 공증을 적용합니다. 변수 없이 빌드하면 미사이닝 번들이 생성되며
 macOS Gatekeeper가 차단합니다(로컬 테스트는 가능, 배포 부적합).
 
+## GitHub Actions로 릴리스
+
+리포지토리 루트에 릴리스 워크플로
+([`.github/workflows/release.yml`](../../.github/workflows/release.yml))가
+정의되어 있습니다. 다음 두 경우에만 발화합니다:
+
+- `v*` 태그 push (`git tag v0.1.1 && git push --tags`)
+- GitHub Actions 페이지에서 **Run workflow** 수동 클릭
+
+두 경로 모두 macOS 러너에서 `pnpm --filter @cut/desktop release:mac` 을
+실행하고, web 정적 export → arm64 + x64 `.dmg` 패키징 → 현재 패키지의
+`package.json` version 과 동일한 GitHub Release 에 업로드합니다.
+`electron-updater` 가 찾을 수 있도록 `latest-mac.yml` 도 함께 생성됩니다.
+
+태그를 푸시하기 전에 이 패키지의 `version` 값을 반드시 동기화하세요 —
+electron-builder가 그 숫자로 Release 이름을 결정합니다.
+
 ## 다음 단계
 
-- `electron-updater` + GitHub Releases를 통한 자동 업데이트(현재 미사이닝
-  빌드도 `build:mac` 통과 — 업데이터 추가는 별도 후속 작업).
-- 내보내기 대상 경로용 네이티브 파일 다이얼로그(현재는 브라우저 다운로드
-  플로우 사용).
 - Mac App Store용 별도 universal 빌드 (electron-builder 타겟 추가).
+- CI 내 사이닝 + 공증 (`CSC_*` / `APPLE_*` secrets 추가 후 `identity: null`
+  제거).
+- Linux / Windows 빌드 (electron-builder 타겟은 존재, 각 OS 러너 필요).

@@ -108,6 +108,41 @@ the 7 model files (~41 MB). The runtime checks that path first via
 The directory is gitignored; rerun the script after each clean checkout or
 inside the desktop build pipeline.
 
+## Cutting a release
+
+Release builds are triggered manually via GitHub Actions — never on every
+push. The workflow lives at
+[`.github/workflows/release.yml`](.github/workflows/release.yml).
+
+**Tagged release (recommended)**
+
+```bash
+# 1. Bump the version in apps/desktop/package.json (e.g. 0.1.0 → 0.1.1).
+#    The number must match the tag you push next.
+
+# 2. Commit the bump.
+git commit -am "chore: bump desktop to 0.1.1"
+git push
+
+# 3. Push the tag — this is what fires the workflow.
+git tag v0.1.1
+git push --tags
+```
+
+About 15 minutes later the matching GitHub Release has both `.dmg`s
+(`-arm64` and Intel) attached, plus `latest-mac.yml` so the built-in
+auto-updater can find them.
+
+**Ad-hoc build** — open the GitHub repo → **Actions** → **Release** →
+**Run workflow**. Uses the current `apps/desktop/package.json` version.
+
+Builds are unsigned by default (`identity: null` in `electron-builder.yml`);
+end users have to right-click → Open the first time. To ship a signed +
+notarised `.dmg`, add the Apple Developer secrets to the repo (`CSC_LINK`,
+`CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`,
+`APPLE_TEAM_ID`) and remove the `identity: null` line — no workflow change
+required.
+
 ## Roadmap (post v0.1)
 
 - WebGPU renderer (wgsl shaders, plugin SDK v2)

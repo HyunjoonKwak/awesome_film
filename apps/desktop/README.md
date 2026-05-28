@@ -83,11 +83,28 @@ pnpm --filter @cut/desktop build:mac
 electron-builder picks them up automatically and runs `notarytool` on the
 resulting `.dmg`. The output is Gatekeeper-clean for distribution.
 
+## Releasing through GitHub Actions
+
+A release workflow lives at
+[`.github/workflows/release.yml`](../../.github/workflows/release.yml). It
+fires only on:
+
+- a `v*` tag push (`git tag v0.1.1 && git push --tags`), or
+- a manual **Run workflow** click on the GitHub Actions page.
+
+Both paths run `pnpm --filter @cut/desktop release:mac` on a macOS runner,
+which builds the static web export, packages arm64 + x64 `.dmg`s, and
+uploads them to a GitHub Release that matches the version in this
+package's `package.json`. `latest-mac.yml` is written too so
+`electron-updater` can find the new build.
+
+Bump this package's `version` field before pushing the tag — electron-builder
+uses that number to name the Release.
+
 ## What's next
 
-- Auto-update via `electron-updater` + GitHub Releases (the unsigned
-  build already passes `build:mac`; adding the updater is a contained
-  follow-up).
-- Native file dialogs for export targets (currently the in-app exporter
-  uses the browser's download flow).
 - Universal Mac App Store build (separate target in electron-builder).
+- Signing + notarisation in CI (add `CSC_*` / `APPLE_*` secrets and remove
+  `identity: null`).
+- Linux / Windows builds (electron-builder targets exist but need CI
+  runners of each OS).
