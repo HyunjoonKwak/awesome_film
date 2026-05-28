@@ -55,8 +55,21 @@ packaging if you want offline-from-first-launch transcription.
 
 ## Code signing & notarisation
 
-Hardened runtime is enabled in `electron-builder.yml`. To sign and
-notarise, export these env vars before running the build:
+Hardened runtime is on by default in `electron-builder.yml`.
+
+**Unsigned build (default)** — runs out of the box. The `.app` works for
+local testing but Gatekeeper blocks it on other machines. Users can still
+launch it via right-click → Open the first time.
+
+```yaml
+# electron-builder.yml currently ships with:
+mac:
+  identity: null      # remove this line once you have a Developer ID
+```
+
+**Signed + notarised build** — requires an Apple Developer ID Application
+certificate. Remove `identity: null` from `electron-builder.yml`, then
+export the env vars before running the build:
 
 ```bash
 export CSC_LINK=/path/to/DeveloperID.p12
@@ -67,9 +80,8 @@ export APPLE_TEAM_ID='ABCDE12345'
 pnpm --filter @cut/desktop build:mac
 ```
 
-electron-builder picks these up automatically and runs `notarytool` on the
-resulting `.dmg`. Without them you get an unsigned bundle that macOS
-Gatekeeper will block — fine for local testing, not for distribution.
+electron-builder picks them up automatically and runs `notarytool` on the
+resulting `.dmg`. The output is Gatekeeper-clean for distribution.
 
 ## What's next
 

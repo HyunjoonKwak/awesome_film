@@ -13,7 +13,7 @@ export const createGL = (canvas: HTMLCanvasElement): GL => {
   return gl;
 };
 
-export const compileShader = (gl: GL, type: number, source: string): WebGLShader => {
+const compileShader = (gl: GL, type: number, source: string): WebGLShader => {
   const sh = gl.createShader(type);
   if (!sh) throw new Error("createShader failed");
   gl.shaderSource(sh, source);

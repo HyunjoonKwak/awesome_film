@@ -1,6 +1,8 @@
 import type { ID, MediaAsset, Project } from "@cut/core";
 import { isMediaClip, sampleKeyframeTrack, type EffectInstance } from "@cut/core";
 import { readMediaFile } from "@/persistence/opfs";
+import { combineInline } from "./audio-mixer-worker";
+import { denoise } from "./spectral-denoise";
 
 const dbToGain = (db: number): number => Math.pow(10, db / 20);
 
@@ -100,6 +102,14 @@ const applyAudioEffects = async (
           Number(fx.params.attackMs ?? 5),
           Number(fx.params.releaseMs ?? 120),
         );
+        break;
+      }
+      case "audio-spectral-denoise": {
+        buf = denoise(buf, sampleRate, {
+          strength: Number(fx.params.strength ?? 1),
+          floor: Number(fx.params.floor ?? 0.1),
+          noiseEstimateMs: Number(fx.params.noiseEstimateMs ?? 250),
+        });
         break;
       }
     }
@@ -226,47 +236,56 @@ export const mixProjectAudio = async (
     }
   }
 
-  // Yield to the event loop every ~5 seconds of audio so long mixes (e.g.
-  // hour-long projects analyzed by the loudness meter) don't freeze the UI.
-  const YIELD_EVERY = sampleRate * 5;
-  const yieldNow = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
-
-  // Combine buses, sidechain-ducking music under voice when enabled.
-  const accum = new Float32Array(totalSamples);
-  if (ducking?.enabled) {
-    const duckGain = Math.pow(10, ducking.amountDb / 20);
-    const threshold = Math.pow(10, ducking.thresholdDb / 20);
-    const win = Math.floor(sampleRate * 0.05);
-    let gain = 1;
-    for (let i = 0; i < totalSamples; i++) {
-      let voiceLevel = 0;
-      const end = Math.min(totalSamples, i + win);
-      for (let j = i; j < end; j += 8) voiceLevel = Math.max(voiceLevel, Math.abs(voiceBus[j]!));
-      const target = voiceLevel > threshold ? duckGain : 1;
-      gain += (target - gain) * 0.002;
-      accum[i] = voiceBus[i]! + musicBus[i]! * gain;
-      if (i > 0 && i % YIELD_EVERY === 0) await yieldNow();
-    }
-  } else {
-    for (let i = 0; i < totalSamples; i++) {
-      accum[i] = voiceBus[i]! + musicBus[i]!;
-      if (i > 0 && i % YIELD_EVERY === 0) await yieldNow();
-    }
-  }
-
-  // Soft limiter to keep us inside [-1, 1].
-  let peak = 0;
-  for (let i = 0; i < accum.length; i++) {
-    peak = Math.max(peak, Math.abs(accum[i]!));
-    if (i > 0 && i % YIELD_EVERY === 0) await yieldNow();
-  }
-  if (peak > 1) {
-    const gain = 1 / peak;
-    for (let i = 0; i < accum.length; i++) {
-      accum[i]! *= gain;
-      if (i > 0 && i % YIELD_EVERY === 0) await yieldNow();
-    }
-  }
+  // Bus combine + ducking + soft limiter run in a Web Worker so the heavy
+  // per-sample loops never touch the main thread. We transfer the bus buffers
+  // both ways, so there are zero copies despite the boundary crossing.
+  const accum = await runCombineWorker({
+    voiceBus,
+    musicBus,
+    sampleRate,
+    ...(ducking ? { ducking } : {}),
+  });
 
   return { pcm: accum, sampleRate };
+};
+
+// Cached worker — created once on first export and reused across runs.
+let mixerWorker: Worker | null = null;
+const getWorker = (): Worker | null => {
+  if (typeof Worker === "undefined") return null;
+  if (mixerWorker) return mixerWorker;
+  try {
+    mixerWorker = new Worker(new URL("./audio-mixer-worker.ts", import.meta.url), { type: "module" });
+    return mixerWorker;
+  } catch {
+    return null;
+  }
+};
+
+const runCombineWorker = async (req: {
+  voiceBus: Float32Array;
+  musicBus: Float32Array;
+  sampleRate: number;
+  ducking?: { enabled: boolean; amountDb: number; thresholdDb: number };
+}): Promise<Float32Array> => {
+  const w = getWorker();
+  if (!w) {
+    // Tests / SSR / browsers without Worker — run inline.
+    return combineInline(req);
+  }
+  return new Promise<Float32Array>((resolve, reject) => {
+    const onMessage = (e: MessageEvent<{ pcm: Float32Array }>) => {
+      w.removeEventListener("message", onMessage);
+      w.removeEventListener("error", onError);
+      resolve(e.data.pcm);
+    };
+    const onError = (err: ErrorEvent) => {
+      w.removeEventListener("message", onMessage);
+      w.removeEventListener("error", onError);
+      reject(err.error ?? new Error(err.message));
+    };
+    w.addEventListener("message", onMessage);
+    w.addEventListener("error", onError);
+    w.postMessage(req, [req.voiceBus.buffer, req.musicBus.buffer]);
+  });
 };

@@ -357,6 +357,8 @@ export const en = {
     "subs.import": "Import SRT or VTT",
     "subs.exportSrt": "Export SRT",
     "subs.exportVtt": "Export VTT",
+    "subs.burnInTitle": "Burn-in style",
+    "subs.styleApplied": "Applied {style} style to {n} subtitles",
     "subs.imported": "Imported {n} subtitle(s)",
     "subs.importEmpty": "No cues in file",
     "subs.importFailed": "Subtitle import failed",

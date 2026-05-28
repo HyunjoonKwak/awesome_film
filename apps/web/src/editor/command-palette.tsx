@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Command, Keyboard, Search } from "lucide-react";
+import { Keyboard, Search } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { usePlaybackStore } from "@/stores/playback-store";
 import { useSelectionStore } from "@/stores/selection-store";
@@ -178,21 +178,3 @@ export function CommandPalette() {
   );
 }
 
-// Small top-bar button to open the palette by click (discoverability).
-export function CommandPaletteButton() {
-  const t = useT();
-  return (
-    <button
-      type="button"
-      className="btn-ghost px-2 py-1 text-xs"
-      title={`${t("cmd.palette")} (Cmd+K)`}
-      onClick={() => {
-        window.dispatchEvent(
-          new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }),
-        );
-      }}
-    >
-      <Command className="size-3.5" />
-    </button>
-  );
-}

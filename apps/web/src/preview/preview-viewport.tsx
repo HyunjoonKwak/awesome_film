@@ -5,6 +5,9 @@ import type { ID } from "@cut/core";
 import { useProjectStore, selectPlayhead } from "@/stores/project-store";
 import { usePlaybackStore } from "@/stores/playback-store";
 import { Compositor } from "@/renderer/compositor";
+// Side-effect import: registers `window.__cutBench(frames)` in dev for
+// console-driven render benchmarks.
+import "@/renderer/bench";
 import { useT } from "@/i18n/use-t";
 import { RegionOverlay } from "./region-overlay";
 import { GuidesOverlay } from "./guides-overlay";

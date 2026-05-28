@@ -96,9 +96,17 @@ fully offline.
 The Whisper transcription model (~40 MB, `Xenova/whisper-tiny.en` quantised
 to `q8`) is downloaded from HuggingFace on first use and cached by the
 browser's HTTP cache thereafter. To make it offline-from-first-launch (e.g.
-for the desktop bundle), pre-download the model and drop it under
-`apps/web/public/whisper/Xenova/whisper-tiny.en/`; the runtime checks that
-path first via `env.localModelPath`.
+for the desktop bundle), run:
+
+```bash
+pnpm --filter @cut/web prebundle:whisper
+```
+
+The script populates `apps/web/public/whisper/Xenova/whisper-tiny.en/` with
+the 7 model files (~41 MB). The runtime checks that path first via
+`env.localModelPath` and only falls back to HuggingFace if a file is missing.
+The directory is gitignored; rerun the script after each clean checkout or
+inside the desktop build pipeline.
 
 ## Roadmap (post v0.1)
 
@@ -108,3 +116,18 @@ path first via `env.localModelPath`.
 - Native desktop wrapper (Tauri)
 - Mobile native shells (Capacitor)
 - Plugin marketplace + sandboxed iframes
+
+### Deferred (assessed, not yet shipped)
+
+- **Compound / nested sequences.** Wrapping a clip range into a reusable
+  sub-timeline. Requires recursive rendering (render the inner sequence
+  to an offscreen FBO, sample that as the parent clip's source) and a
+  new `kind: "compound"` in the discriminated union with non-trivial
+  serialisation / undo / collab considerations. Estimated 2–3 days for an
+  MVP that covers playback + edit, longer for full keyframe propagation.
+- **Background render queue.** Running the export pipeline in a separate
+  Electron `BrowserWindow` / `utilityProcess` so the user keeps editing
+  while a render completes. The pipeline currently runs in the main
+  renderer (WebCodecs lives there). Splitting it cleanly requires a
+  shared OPFS layer and an IPC encoder bridge — estimated 2 days for the
+  desktop bundle alone, more if we want web parity.

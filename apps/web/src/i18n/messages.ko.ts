@@ -357,6 +357,8 @@ export const ko = {
     "subs.import": "SRT/VTT 가져오기",
     "subs.exportSrt": "SRT 내보내기",
     "subs.exportVtt": "VTT 내보내기",
+    "subs.burnInTitle": "번인 스타일",
+    "subs.styleApplied": "{n}개 자막에 {style} 스타일 적용",
     "subs.imported": "{n}개 자막 가져옴",
     "subs.importEmpty": "파일에 자막이 없습니다",
     "subs.importFailed": "자막 가져오기 실패",

@@ -3,7 +3,6 @@
 // the hot path uniforms in one place.
 
 import {
-  isWipe,
   sampleKeyframes,
   type Clip,
   type EffectInstance,
@@ -23,8 +22,6 @@ const WIPE_MODE: Partial<Record<TransitionType, number>> = {
   "wipe-down": 4,
   "wipe-circle": 5,
 };
-
-export const isWipeTransition = isWipe;
 
 export interface ClipTf {
   readonly x: number;

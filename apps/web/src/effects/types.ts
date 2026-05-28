@@ -57,5 +57,3 @@ export interface EffectDefinition {
   readonly passes: readonly EffectPass[];
 }
 
-export const defaultParamsOf = (def: EffectDefinition): EffectParams =>
-  Object.fromEntries(def.params.map((p) => [p.key, p.default]));

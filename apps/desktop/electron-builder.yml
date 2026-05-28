@@ -23,19 +23,36 @@ mac:
       arch:
         - arm64
         - x64
-  icon: "build/icon.png"
+  icon: "build/icon.icns"
   hardenedRuntime: true
   gatekeeperAssess: false
-  # Code signing is intentionally left to the developer's local environment:
+  # `identity: null` produces an unsigned `.app` — useful for local testing
+  # without an Apple Developer ID. To sign + notarise, unset this line and
+  # export the standard env vars:
   #   export CSC_LINK=... CSC_KEY_PASSWORD=...
   #   export APPLE_ID=... APPLE_APP_SPECIFIC_PASSWORD=... APPLE_TEAM_ID=...
-  # electron-builder picks these up automatically.
+  # electron-builder picks them up automatically when CSC_* is set.
+  identity: null
 
 dmg:
+  background: "build/dmg-background.png"
+  window:
+    width: 540
+    height: 380
   contents:
-    - x: 130
+    - x: 150
       y: 220
-    - x: 410
+    - x: 390
       y: 220
       type: link
       path: /Applications
+
+# Auto-update feed. electron-builder writes `latest-mac.yml` + the .dmg to
+# the GitHub Release matching the version in apps/desktop/package.json;
+# electron-updater in main.cjs reads back from the same repo. Set
+# `GH_TOKEN` to a personal access token with `repo` scope before running
+# `pnpm --filter @cut/desktop exec electron-builder --mac --publish=always`.
+publish:
+  - provider: github
+    owner: HyunjoonKwak
+    repo: awesome_film

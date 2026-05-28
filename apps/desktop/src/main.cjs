@@ -5,7 +5,7 @@
 // In dev mode (CUT_DEV_URL env var set) we point straight at the Next dev
 // server so HMR works.
 
-const { app, BrowserWindow, Menu, dialog, protocol, session, shell } = require("electron");
+const { app, BrowserWindow, Menu, dialog, ipcMain, protocol, session, shell } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
 const { pathToFileURL } = require("node:url");
@@ -228,11 +228,60 @@ const buildMenu = (win) => {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 };
 
+// Auto-update via electron-updater + the GitHub Releases publish target
+// configured in electron-builder.yml. Disabled in dev (no installed app to
+// replace) and on unsigned macOS bundles (Apple Squirrel refuses unsigned
+// upgrades), but the check is cheap enough to attempt — failures log and
+// move on, never blocking startup.
+const setupAutoUpdater = () => {
+  if (isDev) return;
+  try {
+    const { autoUpdater } = require("electron-updater");
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.on("error", (err) => {
+      console.warn("[cut-desktop] auto-update error:", err?.message ?? err);
+    });
+    autoUpdater.on("update-available", (info) => {
+      console.log("[cut-desktop] update available:", info?.version);
+    });
+    autoUpdater.on("update-downloaded", (info) => {
+      console.log("[cut-desktop] update downloaded:", info?.version, "— will install on quit");
+    });
+    // Defer the check briefly so the window is up first.
+    setTimeout(() => autoUpdater.checkForUpdatesAndNotify().catch(() => {}), 3000);
+  } catch (err) {
+    console.warn("[cut-desktop] electron-updater unavailable:", err?.message ?? err);
+  }
+};
+
+// IPC: native save dialog used by the export pipeline. The renderer hands
+// us the encoded bytes + a suggested file name; we open a Save panel and,
+// on confirm, write the file to the chosen location. Returns the absolute
+// path written, or null when the user cancelled.
+ipcMain.handle("cut:save-export", async (event, payload) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const { suggestedName, bytes, mimeType } = payload ?? {};
+  if (!bytes || !(bytes instanceof Uint8Array)) {
+    throw new Error("cut:save-export expects bytes:Uint8Array");
+  }
+  const ext = typeof suggestedName === "string" ? path.extname(suggestedName).slice(1) : "";
+  const filters = ext ? [{ name: mimeType ?? ext.toUpperCase(), extensions: [ext] }] : [];
+  const result = await dialog.showSaveDialog(win ?? undefined, {
+    defaultPath: typeof suggestedName === "string" ? suggestedName : undefined,
+    filters,
+  });
+  if (result.canceled || !result.filePath) return null;
+  await fs.promises.writeFile(result.filePath, Buffer.from(bytes));
+  return result.filePath;
+});
+
 app.whenReady().then(() => {
   installDevHeaders();
   if (!isDev) installAppProtocol();
   const win = createWindow();
   buildMenu(win);
+  setupAutoUpdater();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

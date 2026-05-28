@@ -10,7 +10,11 @@
     "build:mac": "pnpm run build:web && electron-builder --mac --config electron-builder.yml",
     "build:mac:arm64": "pnpm run build:web && electron-builder --mac --arm64 --config electron-builder.yml",
     "build:mac:x64": "pnpm run build:web && electron-builder --mac --x64 --config electron-builder.yml",
+    "release:mac": "pnpm run build:web && electron-builder --mac --config electron-builder.yml --publish=always",
     "start": "electron ."
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",

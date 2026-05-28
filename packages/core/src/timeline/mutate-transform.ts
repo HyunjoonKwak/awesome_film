@@ -7,7 +7,7 @@ import type { BlendMode, ClipMask, ClipTransform } from "../model/clip";
 import { clipTransform } from "../model/clip";
 import type { Transition } from "../model/transition";
 import type { ID } from "../utils/id";
-import { dropKey, omitKey } from "./mutate-internal";
+import { dropKey } from "./mutate-internal";
 import { updateClip } from "./mutate-core";
 
 export const setClipTransform = (
@@ -42,7 +42,7 @@ export const setTransitionIn = (
   transition: Transition | undefined,
 ): Project =>
   updateClip(project, clipId, (c) =>
-    transition ? { ...c, transitionIn: transition } : (omitKey(c, "transitionIn") as typeof c),
+    transition ? { ...c, transitionIn: transition } : (dropKey(c, "transitionIn") as typeof c),
   );
 
 export const setTransitionOut = (
@@ -51,5 +51,5 @@ export const setTransitionOut = (
   transition: Transition | undefined,
 ): Project =>
   updateClip(project, clipId, (c) =>
-    transition ? { ...c, transitionOut: transition } : (omitKey(c, "transitionOut") as typeof c),
+    transition ? { ...c, transitionOut: transition } : (dropKey(c, "transitionOut") as typeof c),
   );

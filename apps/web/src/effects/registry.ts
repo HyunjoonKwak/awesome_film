@@ -16,6 +16,7 @@ import { audioGain } from "./definitions/audio-gain";
 import { audioFade } from "./definitions/audio-fade";
 import { audioEq } from "./definitions/audio-eq";
 import { audioNoiseGate } from "./definitions/audio-noise-gate";
+import { audioSpectralDenoise } from "./definitions/audio-spectral-denoise";
 import { lut } from "./definitions/lut";
 import { colorWheels } from "./definitions/color-wheels";
 import { whiteBalance } from "./definitions/white-balance";
@@ -52,6 +53,7 @@ const builtin: readonly EffectDefinition[] = [
   audioFade,
   audioEq,
   audioNoiseGate,
+  audioSpectralDenoise,
 ];
 
 const all = (): readonly EffectDefinition[] => [...builtin, ...getPluginEffects()];
@@ -59,12 +61,3 @@ const all = (): readonly EffectDefinition[] => [...builtin, ...getPluginEffects(
 export const listEffects = (): readonly EffectDefinition[] => all();
 export const getEffect = (type: string): EffectDefinition | undefined =>
   all().find((e) => e.type === type);
-export const searchEffects = (q: string): readonly EffectDefinition[] => {
-  const query = q.trim().toLowerCase();
-  if (!query) return all();
-  return all().filter(
-    (e) =>
-      e.name.toLowerCase().includes(query) ||
-      e.keywords.some((k) => k.toLowerCase().includes(query)),
-  );
-};

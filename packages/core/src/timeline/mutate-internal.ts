@@ -24,6 +24,3 @@ export const dropKey = <T, K extends keyof T>(o: T, k: K): Omit<T, K> => {
   return rest as Omit<T, K>;
 };
 
-// Identical to dropKey; kept under both names because each appeared in the
-// original mutate.ts with its own doc explaining the intent at the call site.
-export const omitKey = dropKey;

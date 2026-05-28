@@ -18,4 +18,7 @@ forward("menu:snapshot", "cut:menu-snapshot");
 contextBridge.exposeInMainWorld("cutDesktop", {
   // Marker the web app can check to enable desktop-only paths if needed.
   isDesktop: true,
+  // Native save dialog → returns the chosen file path, or null on cancel.
+  // Accepts a Uint8Array of encoded bytes; the main process writes the file.
+  saveExport: async (payload) => ipcRenderer.invoke("cut:save-export", payload),
 });

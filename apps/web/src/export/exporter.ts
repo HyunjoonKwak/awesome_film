@@ -248,7 +248,24 @@ const codecForMuxer = (codec: ExportPreset["videoCodec"]): "avc" | "vp9" | "av1"
 
 const sanitizeName = (s: string): string => s.replace(/[^a-z0-9_\-]+/gi, "_").slice(0, 60);
 
-export const downloadBlob = (blob: Blob, filename: string) => {
+// Saves the encoded blob. In the desktop bundle we route through the
+// Electron preload bridge (native Save panel + filesystem write); on the
+// web we fall back to the standard anchor-download flow.
+export const downloadBlob = async (blob: Blob, filename: string): Promise<void> => {
+  const desktop = (
+    typeof window !== "undefined"
+      ? (window as unknown as { cutDesktop?: { saveExport?: (p: { suggestedName: string; bytes: Uint8Array; mimeType?: string }) => Promise<string | null> } }).cutDesktop
+      : undefined
+  );
+  if (desktop?.saveExport) {
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    await desktop.saveExport({
+      suggestedName: filename,
+      bytes,
+      ...(blob.type ? { mimeType: blob.type } : {}),
+    });
+    return;
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

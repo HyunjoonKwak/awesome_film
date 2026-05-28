@@ -74,7 +74,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
         const exporter = new WebCodecsExporter();
         exporterRef.current = exporter;
         const result = await exporter.start({ projectId, preset }, setProgress);
-        downloadBlob(result.blob, result.suggestedName);
+        await downloadBlob(result.blob, result.suggestedName);
         toast.success(t("export.success", { name: result.suggestedName }));
         exporterRef.current = null;
       }

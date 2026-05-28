@@ -93,9 +93,18 @@ MediaPipe(배경 제거) wasm 런타임과 Selfie Segmenter 모델은
 
 Whisper 자막 모델(~40 MB, `Xenova/whisper-tiny.en` q8 양자화)은 첫 사용 시
 HuggingFace에서 다운로드되며, 이후 브라우저 HTTP 캐시에 보관됩니다. 첫 실행
-시점부터 오프라인으로 동작시키려면(데스크톱 번들 등) 모델 파일을 사전
-다운로드해 `apps/web/public/whisper/Xenova/whisper-tiny.en/` 경로에 두세요.
-런타임이 `env.localModelPath` 설정을 통해 해당 경로를 먼저 확인합니다.
+시점부터 오프라인으로 동작시키려면(데스크톱 번들 등) 아래 스크립트를
+실행하세요:
+
+```bash
+pnpm --filter @cut/web prebundle:whisper
+```
+
+스크립트가 `apps/web/public/whisper/Xenova/whisper-tiny.en/`에 모델 파일 7개
+(약 41 MB)를 채웁니다. 런타임이 `env.localModelPath`로 해당 경로를 먼저
+확인하고, 파일이 없을 때만 HuggingFace로 폴백합니다. 해당 디렉토리는
+gitignore되어 있으므로 새로운 체크아웃마다 또는 데스크톱 빌드 파이프라인 안에서
+재실행하세요.
 
 ## 로드맵 (v0.1 이후)
 
@@ -105,3 +114,16 @@ HuggingFace에서 다운로드되며, 이후 브라우저 HTTP 캐시에 보관�
 - Tauri 네이티브 데스크톱 래퍼
 - Capacitor 모바일 네이티브 셸
 - 플러그인 마켓플레이스 + 샌드박스 iframe
+
+### 보류 항목 (평가 완료, 미출시)
+
+- **컴파운드/네스티드 시퀀스**. 클립 묶음을 재사용 가능한 서브-타임라인으로
+  감싸는 기능. 재귀 렌더링(내부 시퀀스를 오프스크린 FBO로 렌더 후 부모
+  클립의 소스로 샘플)과 `kind: "compound"` 신규 추가, 직렬화·실행취소·협업
+  처리가 필요. MVP(재생+편집)에 2~3일, 키프레임 전파 완전 지원까지는 더
+  소요 예상.
+- **백그라운드 렌더 큐**. 내보내기 파이프라인을 별도 Electron
+  `BrowserWindow`/`utilityProcess`로 분리해 렌더 중에도 편집 가능하게
+  만드는 기능. 현재 파이프라인은 메인 렌더러에서 동작(WebCodecs도 거기
+  있음). 분리하려면 공유 OPFS 레이어와 IPC 인코더 브릿지가 필요 — 데스크톱
+  번들 한정 2일 예상, 웹과 동등 기능까지 가려면 더 소요.
