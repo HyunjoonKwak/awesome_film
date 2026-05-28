@@ -20,10 +20,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Version is read from the root package.json `packageManager` field
+      # (pnpm@9.12.0). Don't pass `version:` here — action-setup@v4 errors
+      # if both are specified.
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
