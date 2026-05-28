@@ -62,6 +62,42 @@ pnpm dev          # http://localhost:3000
 
 Requirements: Node 20+, pnpm 9+.
 
+## Install as an app on macOS
+
+cut_editor ships a PWA manifest + service worker so you can install it as a
+standalone desktop window — no extra tooling required.
+
+**Safari (recommended on macOS)**
+
+1. Open the running site (e.g. `https://your-host/editor`) in Safari 17+.
+2. **File → Add to Dock…**
+3. Confirm the name and icon, then click Add.
+
+The app launches in its own window with no browser chrome and gets its own
+dock entry. The bundled service worker caches the app shell so you can keep
+editing through brief network drops.
+
+**Chrome / Edge**
+
+Click the install icon (⊕) in the address bar, or **File → Install** to add
+the app to Launchpad and the dock.
+
+For a fully-native `.app` bundle with menus, file dialogs, and auto-update
+see [`apps/desktop/`](apps/desktop/).
+
+### Bundled local AI models
+
+MediaPipe (background removal) wasm runtime and the Selfie Segmenter model
+are vendored under `apps/web/public/mediapipe/`, so background removal works
+fully offline.
+
+The Whisper transcription model (~40 MB, `Xenova/whisper-tiny.en` quantised
+to `q8`) is downloaded from HuggingFace on first use and cached by the
+browser's HTTP cache thereafter. To make it offline-from-first-launch (e.g.
+for the desktop bundle), pre-download the model and drop it under
+`apps/web/public/whisper/Xenova/whisper-tiny.en/`; the runtime checks that
+path first via `env.localModelPath`.
+
 ## Roadmap (post v0.1)
 
 - WebGPU renderer (wgsl shaders, plugin SDK v2)

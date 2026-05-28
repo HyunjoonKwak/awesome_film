@@ -11,8 +11,14 @@ let pipelinePromise: Promise<{
 
 const loadPipeline = async () => {
   const { pipeline, env } = await import("@huggingface/transformers");
-  // Always pull from the public CDN; never look on disk.
-  env.allowLocalModels = false;
+  // Offline-first: prefer a locally vendored copy under /whisper/ if present;
+  // otherwise download from HuggingFace once and rely on the browser cache.
+  // For a fully self-contained desktop bundle, place the model files under
+  // `apps/web/public/whisper/Xenova/whisper-tiny.en/` (see README).
+  env.allowLocalModels = true;
+  env.allowRemoteModels = true;
+  env.localModelPath = "/whisper/";
+  env.useBrowserCache = true;
   const tx = await pipeline("automatic-speech-recognition", "Xenova/whisper-tiny.en", {
     dtype: "q8",
   });

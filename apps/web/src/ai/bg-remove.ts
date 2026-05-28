@@ -7,16 +7,17 @@ let segmenterPromise: Promise<{
   segmentFor(source: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement): Promise<ImageData | null>;
 }> | null = null;
 
+// Locally vendored wasm + model assets (see apps/web/public/mediapipe/).
+// Keeps the app fully offline-capable and ready for the desktop bundle —
+// no jsdelivr / storage.googleapis hits at runtime.
+const MP_WASM_DIR = "/mediapipe/wasm";
+const MP_SEGMENTER_MODEL = "/mediapipe/models/selfie_segmenter.tflite";
+
 const loadSegmenter = async () => {
   const vision = await import("@mediapipe/tasks-vision");
-  const fileset = await vision.FilesetResolver.forVisionTasks(
-    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm",
-  );
+  const fileset = await vision.FilesetResolver.forVisionTasks(MP_WASM_DIR);
   const segmenter = await vision.ImageSegmenter.createFromOptions(fileset, {
-    baseOptions: {
-      modelAssetPath:
-        "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite",
-    },
+    baseOptions: { modelAssetPath: MP_SEGMENTER_MODEL },
     runningMode: "IMAGE",
     outputCategoryMask: true,
     outputConfidenceMasks: false,

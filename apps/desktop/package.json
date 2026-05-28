@@ -1,0 +1,22 @@
+{
+  "name": "@cut/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Electron shell that packages the cut_editor web app as a native macOS application.",
+  "main": "src/main.cjs",
+  "scripts": {
+    "dev": "concurrently -k -n web,electron -c blue,green \"pnpm --filter @cut/web dev\" \"wait-on http://localhost:3000/editor && CUT_DEV_URL=http://localhost:3000 electron .\"",
+    "build:web": "pnpm --filter @cut/web exec cross-env NEXT_OUTPUT=export next build",
+    "build:mac": "pnpm run build:web && electron-builder --mac --config electron-builder.yml",
+    "build:mac:arm64": "pnpm run build:web && electron-builder --mac --arm64 --config electron-builder.yml",
+    "build:mac:x64": "pnpm run build:web && electron-builder --mac --x64 --config electron-builder.yml",
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "wait-on": "^8.0.1"
+  }
+}

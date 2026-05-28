@@ -1,0 +1,21 @@
+// Preload script. Exposes a small, typed bridge between the Electron main
+// process (native menus, save dialog) and the web app's renderer.
+//
+// The web app stays origin-agnostic: it listens for `cut:export` and
+// `cut:snapshot` window events, which the bridge re-dispatches from IPC.
+
+const { contextBridge, ipcRenderer } = require("electron");
+
+const forward = (channel, eventName) => {
+  ipcRenderer.on(channel, () => {
+    window.dispatchEvent(new CustomEvent(eventName));
+  });
+};
+
+forward("menu:export", "cut:menu-export");
+forward("menu:snapshot", "cut:menu-snapshot");
+
+contextBridge.exposeInMainWorld("cutDesktop", {
+  // Marker the web app can check to enable desktop-only paths if needed.
+  isDesktop: true,
+});

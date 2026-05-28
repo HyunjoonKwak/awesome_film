@@ -1,0 +1,250 @@
+// Electron main process. Wraps the static-exported web app from
+// ../web/out and serves it via a custom `app://` protocol so the service
+// worker and SharedArrayBuffer (COOP/COEP) keep working.
+//
+// In dev mode (CUT_DEV_URL env var set) we point straight at the Next dev
+// server so HMR works.
+
+const { app, BrowserWindow, Menu, dialog, protocol, session, shell } = require("electron");
+const path = require("node:path");
+const fs = require("node:fs");
+const { pathToFileURL } = require("node:url");
+
+const isDev = !!process.env.CUT_DEV_URL;
+const DEV_URL = process.env.CUT_DEV_URL ?? "http://localhost:3000/editor";
+// In a packaged build the web export lives at <Resources>/web (see
+// electron-builder.yml `extraResources`). Unpackaged runs read from the
+// repo's apps/web/out directory.
+const WEB_OUT = app.isPackaged
+  ? path.join(process.resourcesPath, "web")
+  : path.join(__dirname, "..", "..", "web", "out");
+
+// Privileged custom protocol — required so the service worker can register
+// against it and SharedArrayBuffer is allowed (treated as secure context).
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "app",
+    privileges: {
+      secure: true,
+      standard: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+    },
+  },
+]);
+
+const mimeFromExt = (ext) => {
+  const map = {
+    ".html": "text/html; charset=utf-8",
+    ".js": "application/javascript; charset=utf-8",
+    ".mjs": "application/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+    ".webmanifest": "application/manifest+json; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".wasm": "application/wasm",
+    ".tflite": "application/octet-stream",
+    ".woff": "font/woff",
+    ".woff2": "font/woff2",
+    ".map": "application/json; charset=utf-8",
+  };
+  return map[ext] ?? "application/octet-stream";
+};
+
+// Resolve an `app://` URL into a file on disk under WEB_OUT. Next's static
+// export emits trailing-slash directories with index.html, so we mirror that.
+const resolveAppPath = (urlPath) => {
+  // Strip query string, decode, normalise.
+  const cleaned = decodeURIComponent(urlPath.split("?")[0].split("#")[0]);
+  // Block path traversal.
+  if (cleaned.includes("..")) return null;
+  let rel = cleaned.replace(/^\/+/, "");
+  if (rel === "" || rel.endsWith("/")) rel += "index.html";
+  let target = path.join(WEB_OUT, rel);
+  // Fall back to <route>.html when the asset isn't a directory index.
+  if (!fs.existsSync(target) && !path.extname(target)) {
+    if (fs.existsSync(`${target}.html`)) target = `${target}.html`;
+    else target = path.join(WEB_OUT, "index.html");
+  }
+  return target;
+};
+
+const createWindow = () => {
+  const win = new BrowserWindow({
+    width: 1440,
+    height: 900,
+    minWidth: 960,
+    minHeight: 600,
+    backgroundColor: "#0b0d10",
+    titleBarStyle: "hiddenInset",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.cjs"),
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+    },
+  });
+
+  if (isDev) {
+    win.loadURL(DEV_URL);
+    win.webContents.openDevTools({ mode: "detach" });
+  } else {
+    win.loadURL("app://cut-editor/editor/");
+  }
+
+  // External http(s) links open in the user's browser, not in-app.
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      shell.openExternal(url);
+      return { action: "deny" };
+    }
+    return { action: "allow" };
+  });
+
+  return win;
+};
+
+const installAppProtocol = () => {
+  protocol.handle("app", async (request) => {
+    const url = new URL(request.url);
+    const target = resolveAppPath(url.pathname);
+    if (!target || !fs.existsSync(target)) {
+      return new Response("Not found", { status: 404 });
+    }
+    const body = await fs.promises.readFile(target);
+    return new Response(body, {
+      status: 200,
+      headers: {
+        "Content-Type": mimeFromExt(path.extname(target).toLowerCase()),
+        // Match the web app's COOP/COEP so SharedArrayBuffer + wasm threads work.
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Embedder-Policy": "require-corp",
+      },
+    });
+  });
+};
+
+// Inject COOP/COEP on the dev server's responses too — Next's dev middleware
+// already does this but the Electron session sometimes drops them, so be
+// explicit. (For HTTP origins; the app:// handler sets them above.)
+const installDevHeaders = () => {
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    if (!details.url.startsWith("http://localhost")) return callback({});
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        "Cross-Origin-Opener-Policy": ["same-origin"],
+        "Cross-Origin-Embedder-Policy": ["require-corp"],
+      },
+    });
+  });
+};
+
+const buildMenu = (win) => {
+  const isMac = process.platform === "darwin";
+  const send = (channel) => () => win.webContents.send(channel);
+  const template = [
+    ...(isMac
+      ? [
+          {
+            label: app.name,
+            submenu: [
+              { role: "about" },
+              { type: "separator" },
+              { role: "services" },
+              { type: "separator" },
+              { role: "hide" },
+              { role: "hideOthers" },
+              { role: "unhide" },
+              { type: "separator" },
+              { role: "quit" },
+            ],
+          },
+        ]
+      : []),
+    {
+      label: "File",
+      submenu: [
+        {
+          label: "Export…",
+          accelerator: "CmdOrCtrl+E",
+          click: send("menu:export"),
+        },
+        {
+          label: "Save snapshot",
+          accelerator: "CmdOrCtrl+S",
+          click: send("menu:snapshot"),
+        },
+        { type: "separator" },
+        isMac ? { role: "close" } : { role: "quit" },
+      ],
+    },
+    {
+      label: "Edit",
+      submenu: [
+        { role: "undo" },
+        { role: "redo" },
+        { type: "separator" },
+        { role: "cut" },
+        { role: "copy" },
+        { role: "paste" },
+        { role: "selectAll" },
+      ],
+    },
+    {
+      label: "View",
+      submenu: [
+        { role: "reload" },
+        { role: "forceReload" },
+        { role: "toggleDevTools" },
+        { type: "separator" },
+        { role: "resetZoom" },
+        { role: "zoomIn" },
+        { role: "zoomOut" },
+        { type: "separator" },
+        { role: "togglefullscreen" },
+      ],
+    },
+    {
+      label: "Window",
+      submenu: [{ role: "minimize" }, { role: "zoom" }, { role: "close" }],
+    },
+    {
+      role: "help",
+      submenu: [
+        {
+          label: "Project on GitHub",
+          click: () => shell.openExternal("https://github.com/HyunjoonKwak/awesome_film"),
+        },
+      ],
+    },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+};
+
+app.whenReady().then(() => {
+  installDevHeaders();
+  if (!isDev) installAppProtocol();
+  const win = createWindow();
+  buildMenu(win);
+
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") app.quit();
+});
+
+// Diagnostic helper for verifying the bundle in CI.
+// eslint-disable-next-line no-console
+console.log("[cut-desktop] booting", { isDev, devUrl: DEV_URL, webOut: WEB_OUT, exists: fs.existsSync(WEB_OUT) });
+// Silence the unused-export warning for pathToFileURL when no callers reach it.
+void pathToFileURL;
