@@ -1,5 +1,7 @@
 # @cut/desktop
 
+**English** · [한국어](README.ko.md)
+
 Electron shell that packages the cut_editor web app as a native macOS
 application. The web bundle (Next.js static export from `apps/web`) is
 served via a custom `app://` protocol so Service Worker registration and

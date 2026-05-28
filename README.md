@@ -1,5 +1,7 @@
 # cut_editor
 
+**English** · [한국어](README.ko.md)
+
 An open-source, AI-native, collaborative video editor for the web — built to
 match Final Cut Pro's craft and CapCut's accessibility, with collaboration
 and AI features neither of them ships.

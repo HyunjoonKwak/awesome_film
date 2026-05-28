@@ -1,0 +1,107 @@
+# cut_editor
+
+[English](README.md) · **한국어**
+
+웹용 오픈소스 AI 기반 협업 비디오 에디터 — Final Cut Pro의 완성도와 CapCut의
+접근성을 모두 잡되, 두 도구 어디에도 없는 협업·로컬 AI 기능까지 함께 제공합니다.
+
+> [OpenCut](https://github.com/OpenCut-app/OpenCut) 학습에서 출발했습니다
+> (오프라인 참고용으로 `reference/`에 클론, 빌드에 포함되지 않음).
+
+## 왜 또 하나의 에디터인가?
+
+| | Final Cut Pro | CapCut | OpenCut | **cut_editor** |
+|--|:--:|:--:|:--:|:--:|
+| 오픈소스 | ❌ | ❌ | ✅ | ✅ |
+| 전체 기능 무료 | ❌ | 일부 | ✅ | ✅ |
+| 브라우저 네이티브 | ❌ | ❌ | ✅ | ✅ |
+| AI: 자막 + 장면 + 묵음 | 일부 | ✅ | 일부 | ✅ |
+| 로컬 AI (Whisper, MediaPipe) | ❌ | ❌ | 일부 | ✅ |
+| 실시간 협업 편집 | ❌ | 일부 | ❌ | ✅ |
+| 플러그인 SDK | ✅ | ❌ | ❌ | ✅ |
+| 마그네틱 타임라인 + 리플 | ✅ | ❌ | 일부 | ✅ |
+| 모바일 우선 제스처 | n/a | ✅ | ❌ | ✅ |
+| 로컬 우선 영속화 | 일부 | ❌ | 일부 | ✅ |
+
+전체 매트릭스는 [`docs/01-feature-matrix.md`](docs/01-feature-matrix.md),
+기술 설계는 [`docs/02-architecture.md`](docs/02-architecture.md), 플러그인
+SDK는 [`docs/03-plugin-sdk.md`](docs/03-plugin-sdk.md)를 참고하세요.
+
+## 현재 동작하는 기능
+
+| 레이어 | 기능 |
+|--|--|
+| 코어 모델 | 불변 Project / Track / Clip / Effect / Keyframe / Transition + 실행취소·다시실행 |
+| 타임라인 | 멀티트랙, 마그네틱 스냅, 리플, 트림/분할/이동, 트랙 간 드래그, 핀치 줌 |
+| 렌더러 | WebGL2 컴포지터, ping-pong FBO, 다중 패스 이펙트 체인, 키프레임 보간 |
+| 이펙트 | 밝기, 가우시안 블러, 비네트, 배경 제거 — 모두 GLSL ES 3.0 프래그먼트 패스 |
+| 텍스트 | Canvas2D 렌더 텍스트 클립(크기/색/배경 조절) + 전용 자막 트랙 |
+| 미디어 | OPFS 기반 자산, 썸네일/파형 분석, 드래그-드롭 입수 |
+| AI (전부 로컬) | 자동 묵음 컷(WebAudio RMS), Whisper 자막(HuggingFace), 장면 감지(χ²), 배경 제거(MediaPipe Selfie) |
+| 내보내기 | WebCodecs H.264/VP9/AV1 + AAC 오디오 믹서, 4종 프리셋 (YouTube 1080p/4K, TikTok 9:16, Web VP9) |
+| 영속화 | Yjs CRDT + IndexedDB — 새로고침·브라우저 재시작에도 유지 |
+| 협업 | y-websocket 룸 코드 입장/퇴장, 상단 바에 awareness 표시 |
+| 플러그인 SDK | `window.cutEditor.registerEffect` + `registerShader`, `localStorage["cut.plugins"]`로 URL 로드 |
+| 모바일 | 반응형 셸 + 드로어 패널 + 투핑거 핀치 줌 |
+
+## 저장소 구조
+
+```
+apps/web/         Next.js 15 앱 (에디터 UI)
+apps/desktop/     Electron 셸 (macOS .app/.dmg 패키징)
+packages/core/    프레임워크 독립 엔진 (데이터 모델, 스케줄러, 렌더러)
+docs/             설계 문서 + 플러그인 SDK
+reference/        학습용 OpenCut 클론 (gitignored)
+```
+
+## 빠른 시작
+
+```bash
+pnpm install
+pnpm dev          # http://localhost:3000
+```
+
+요구사항: Node 20+, pnpm 9+.
+
+## macOS 앱으로 설치하기
+
+cut_editor는 PWA manifest + 서비스 워커를 동봉하므로 별도 도구 없이 독립
+데스크톱 윈도우로 설치할 수 있습니다.
+
+**Safari (macOS 권장)**
+
+1. 실행 중인 사이트(예: `https://your-host/editor`)를 Safari 17+에서 엽니다.
+2. **파일 → Dock에 추가…**
+3. 이름과 아이콘을 확인하고 추가를 클릭합니다.
+
+브라우저 크롬 없는 독립 윈도우로 실행되며 별도 dock 항목을 가집니다. 동봉된
+서비스 워커가 앱 셸을 캐시해 짧은 네트워크 단절에도 계속 편집할 수 있습니다.
+
+**Chrome / Edge**
+
+주소창의 설치 아이콘(⊕)을 클릭하거나 **파일 → 설치**를 선택해 Launchpad와
+dock에 앱을 추가합니다.
+
+메뉴·파일 다이얼로그·자동 업데이트를 갖춘 완전한 네이티브 `.app` 번들이
+필요하면 [`apps/desktop/`](apps/desktop/)을 참고하세요.
+
+### 동봉된 로컬 AI 모델
+
+MediaPipe(배경 제거) wasm 런타임과 Selfie Segmenter 모델은
+`apps/web/public/mediapipe/`에 포함되어 있어 배경 제거 기능은 완전 오프라인
+동작합니다.
+
+Whisper 자막 모델(~40 MB, `Xenova/whisper-tiny.en` q8 양자화)은 첫 사용 시
+HuggingFace에서 다운로드되며, 이후 브라우저 HTTP 캐시에 보관됩니다. 첫 실행
+시점부터 오프라인으로 동작시키려면(데스크톱 번들 등) 모델 파일을 사전
+다운로드해 `apps/web/public/whisper/Xenova/whisper-tiny.en/` 경로에 두세요.
+런타임이 `env.localModelPath` 설정을 통해 해당 경로를 먼저 확인합니다.
+
+## 로드맵 (v0.1 이후)
+
+- WebGPU 렌더러 (wgsl 셰이더, 플러그인 SDK v2)
+- 클립별 트랜스폼(이동/회전/스케일) + 키프레임 UI
+- 마스크 그리기 도구 + 트래킹
+- Tauri 네이티브 데스크톱 래퍼
+- Capacitor 모바일 네이티브 셸
+- 플러그인 마켓플레이스 + 샌드박스 iframe

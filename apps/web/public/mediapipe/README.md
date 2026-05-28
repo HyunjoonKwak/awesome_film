@@ -1,5 +1,7 @@
 # Vendored MediaPipe assets
 
+**English** · [한국어](README.ko.md)
+
 Local copies of the MediaPipe Tasks Vision runtime + Selfie Segmenter model.
 Vendored here so the background-removal feature works fully offline (no
 runtime hits to `cdn.jsdelivr.net` or `storage.googleapis.com`) and is
