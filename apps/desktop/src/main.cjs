@@ -12,6 +12,10 @@ const { pathToFileURL } = require("node:url");
 
 const isDev = !!process.env.CUT_DEV_URL;
 const DEV_URL = process.env.CUT_DEV_URL ?? "http://localhost:3000/editor";
+
+// Proper product name for the application menu / dock (package.json's
+// lowercase `name` would otherwise leak into the UI).
+app.setName("Cut Editor");
 // In a packaged build the web export lives at <Resources>/web (see
 // electron-builder.yml `extraResources`). Unpackaged runs read from the
 // repo's apps/web/out directory.
@@ -75,14 +79,44 @@ const resolveAppPath = (urlPath) => {
   return target;
 };
 
+// Window bounds persistence — restore the last size/position/maximized
+// state across launches instead of resetting to the defaults every time.
+const windowStateFile = () => path.join(app.getPath("userData"), "window-state.json");
+
+const loadWindowState = () => {
+  try {
+    return JSON.parse(fs.readFileSync(windowStateFile(), "utf8"));
+  } catch {
+    return null;
+  }
+};
+
+const saveWindowState = (win) => {
+  try {
+    const bounds = win.getNormalBounds();
+    fs.writeFileSync(
+      windowStateFile(),
+      JSON.stringify({ ...bounds, maximized: win.isMaximized() }),
+    );
+  } catch (err) {
+    console.warn("[cut-desktop] could not persist window state:", err?.message ?? err);
+  }
+};
+
 const createWindow = () => {
+  const state = loadWindowState();
   const win = new BrowserWindow({
-    width: 1440,
-    height: 900,
+    width: state?.width ?? 1440,
+    height: state?.height ?? 900,
+    ...(Number.isFinite(state?.x) && Number.isFinite(state?.y)
+      ? { x: state.x, y: state.y }
+      : {}),
     minWidth: 960,
     minHeight: 600,
     backgroundColor: "#0b0d10",
     titleBarStyle: "hiddenInset",
+    // Center the traffic lights vertically in the web app's 44px top bar.
+    trafficLightPosition: { x: 16, y: 14 },
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -90,6 +124,8 @@ const createWindow = () => {
       nodeIntegration: false,
     },
   });
+  if (state?.maximized) win.maximize();
+  win.on("close", () => saveWindowState(win));
 
   if (isDev) {
     win.loadURL(DEV_URL);

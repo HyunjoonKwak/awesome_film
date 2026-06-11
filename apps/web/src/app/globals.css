@@ -56,4 +56,16 @@
   .btn-ghost {
     @apply btn text-ink-2 hover:bg-white/5 hover:text-ink-1;
   }
+
+  /* Electron desktop: make the top bar act as the native title bar
+     (hiddenInset window). Interactive children opt back out so buttons,
+     inputs and links stay clickable. */
+  .app-region-drag {
+    -webkit-app-region: drag;
+  }
+  .app-region-drag button,
+  .app-region-drag input,
+  .app-region-drag a {
+    -webkit-app-region: no-drag;
+  }
 }

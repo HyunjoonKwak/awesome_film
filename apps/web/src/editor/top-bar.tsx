@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Check, Cloud, Download, Film, Loader2, Redo2, Undo2 } from "lucide-react";
+import { toast } from "sonner";
 import { useProjectStore } from "@/stores/project-store";
 import { useSaveStateStore } from "@/collab/save-state-store";
+import { saveSnapshot } from "@/persistence/snapshots";
 import { ExportDialog } from "@/export/export-dialog";
 import { CollabBar } from "@/collab/collab-bar";
 import { ProjectMenu } from "./project-menu";
@@ -25,6 +27,28 @@ export function TopBar() {
   const [draftName, setDraftName] = useState(projectName);
   useEffect(() => setDraftName(projectName), [projectName]);
   const t = useT();
+
+  // Surface the active project in the window / tab title.
+  useEffect(() => {
+    document.title = `${projectName} — Cut Editor`;
+  }, [projectName]);
+
+  // Desktop (Electron) native menu bridge: the preload script re-dispatches
+  // File-menu IPC as window events — wire them to the matching UI actions.
+  useEffect(() => {
+    const onMenuExport = () => setExportOpen(true);
+    const onMenuSnapshot = () => {
+      void saveSnapshot(useProjectStore.getState().project, "").then(() =>
+        toast.success(t("snap.saved")),
+      );
+    };
+    window.addEventListener("cut:menu-export", onMenuExport);
+    window.addEventListener("cut:menu-snapshot", onMenuSnapshot);
+    return () => {
+      window.removeEventListener("cut:menu-export", onMenuExport);
+      window.removeEventListener("cut:menu-snapshot", onMenuSnapshot);
+    };
+  }, [t]);
 
   return (
     <div className="flex h-full items-center justify-between gap-4 px-4">

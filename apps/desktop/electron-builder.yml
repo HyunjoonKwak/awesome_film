@@ -1,6 +1,6 @@
 appId: dev.cuteditor.app
-productName: cut_editor
-copyright: Copyright © 2026 cut_editor contributors
+productName: Cut Editor
+copyright: Copyright © 2026 Cut Editor contributors
 
 directories:
   output: dist
