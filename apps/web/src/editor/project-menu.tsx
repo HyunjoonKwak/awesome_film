@@ -162,7 +162,7 @@ export function ProjectMenu() {
                   className="flex-1 text-left text-sm text-ink-1 hover:text-accent"
                 >
                   <span className="block font-medium">{row.name}</span>
-                  <span className="block text-[10px] text-ink-3">
+                  <span className="block text-3xs text-ink-3">
                     {new Date(row.updatedAt).toLocaleString()}
                   </span>
                 </button>

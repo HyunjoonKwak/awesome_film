@@ -61,7 +61,7 @@ export function MulticamPanel() {
           <p className="px-2 py-6 text-center text-xs text-ink-3">{t("multicam.noVideo")}</p>
         ) : (
           <>
-            <p className="mb-2 px-1 text-[11px] text-ink-3">{t("multicam.pickAngles")}</p>
+            <p className="mb-2 px-1 text-2xs text-ink-3">{t("multicam.pickAngles")}</p>
             <ul className="grid grid-cols-2 gap-2">
               {videoAssets.map((a) => (
                 <li key={a.id}>
@@ -79,7 +79,7 @@ export function MulticamPanel() {
                         <img src={a.thumbDataUrl} alt={a.name} className="size-full object-cover" />
                       )}
                     </div>
-                    <span className="block truncate px-2 py-1 text-[11px] text-ink-1">{a.name}</span>
+                    <span className="block truncate px-2 py-1 text-2xs text-ink-1">{a.name}</span>
                   </button>
                 </li>
               ))}
@@ -90,7 +90,7 @@ export function MulticamPanel() {
 
             {angles.length > 0 && (
               <>
-                <p className="mb-2 mt-4 px-1 text-[11px] text-ink-3">{t("multicam.switchHint")}</p>
+                <p className="mb-2 mt-4 px-1 text-2xs text-ink-3">{t("multicam.switchHint")}</p>
                 <div className="grid grid-cols-2 gap-2">
                   {angles.map((angle) => (
                     <button

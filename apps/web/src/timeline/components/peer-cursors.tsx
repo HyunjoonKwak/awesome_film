@@ -24,7 +24,7 @@ export function PeerCursors() {
         >
           <div className="h-full w-px" style={{ backgroundColor: p.color }} />
           <span
-            className="absolute top-0 -translate-x-1/2 whitespace-nowrap rounded px-1 py-0.5 text-[9px] font-medium text-white"
+            className="absolute top-0 -translate-x-1/2 whitespace-nowrap rounded px-1 py-0.5 text-3xs font-medium text-white"
             style={{ backgroundColor: p.color }}
           >
             {p.name}

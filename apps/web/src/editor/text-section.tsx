@@ -53,7 +53,7 @@ export function TextSection({ clip }: Props) {
             key={p.key}
             type="button"
             onClick={() => update(clip.id, p.patch)}
-            className="rounded bg-panel-2 px-2 py-0.5 text-[10px] text-ink-3 hover:bg-white/10 hover:text-ink-1"
+            className="rounded bg-panel-2 px-2 py-0.5 text-3xs text-ink-3 hover:bg-white/10 hover:text-ink-1"
           >
             {t(`text.preset.${p.key}`)}
           </button>
@@ -113,7 +113,7 @@ export function TextSection({ clip }: Props) {
           step={1}
           value={clip.size}
           onChange={(e) => update(clip.id, { size: Number(e.target.value) })}
-          className="flex-1 accent-indigo-500"
+          className="flex-1 accent-accent"
         />
         <span className="w-10 text-right font-mono text-xs text-ink-1">{clip.size}</span>
       </Row>
@@ -135,7 +135,7 @@ export function TextSection({ clip }: Props) {
         <button
           type="button"
           onClick={() => update(clip.id, { bgColor: "" })}
-          className="text-[10px] text-ink-3 hover:text-ink-1"
+          className="text-3xs text-ink-3 hover:text-ink-1"
         >
           {t("text.clear")}
         </button>
@@ -149,7 +149,7 @@ export function TextSection({ clip }: Props) {
           step={1}
           value={clip.strokeWidth ?? 0}
           onChange={(e) => update(clip.id, { strokeWidth: Number(e.target.value) })}
-          className="flex-1 accent-indigo-500"
+          className="flex-1 accent-accent"
         />
         <input
           type="color"
@@ -163,7 +163,7 @@ export function TextSection({ clip }: Props) {
           type="checkbox"
           checked={clip.shadow !== false}
           onChange={(e) => update(clip.id, { shadow: e.target.checked })}
-          className="accent-indigo-500"
+          className="accent-accent"
         />
         <input
           type="range"
@@ -173,11 +173,11 @@ export function TextSection({ clip }: Props) {
           value={clip.shadowBlur ?? Math.max(2, Math.round(clip.size * 0.1))}
           disabled={clip.shadow === false}
           onChange={(e) => update(clip.id, { shadowBlur: Number(e.target.value) })}
-          className="flex-1 accent-indigo-500 disabled:opacity-40"
+          className="flex-1 accent-accent disabled:opacity-40"
         />
       </Row>
 
-      <div className="text-[11px] uppercase tracking-wide text-ink-3">{t("text.anim")}</div>
+      <div className="text-2xs uppercase tracking-wide text-ink-3">{t("text.anim")}</div>
       <Row label={t("text.animIn")}>
         <select
           value={clip.animIn ?? "none"}
@@ -214,7 +214,7 @@ export function TextSection({ clip }: Props) {
           onChange={(e) => update(clip.id, { animMs: Math.max(100, Number(e.target.value)) })}
           className="w-20 rounded bg-white/5 px-2 py-1 text-right text-xs text-ink-1 outline-none"
         />
-        <span className="text-[10px] text-ink-3">ms</span>
+        <span className="text-3xs text-ink-3">ms</span>
       </Row>
     </InspectorSection>
   );
@@ -223,7 +223,7 @@ export function TextSection({ clip }: Props) {
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="w-20 text-[11px] uppercase tracking-wide text-ink-3">{label}</span>
+      <span className="w-20 text-2xs uppercase tracking-wide text-ink-3">{label}</span>
       {children}
     </div>
   );

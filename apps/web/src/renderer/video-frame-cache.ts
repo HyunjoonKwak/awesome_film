@@ -42,7 +42,7 @@ export class VideoFrameCache {
 
   nearest(assetId: string, targetUs: number): CachedFrame | null {
     let best: CachedFrame | null = null;
-    let bestDelta = Infinity;
+    let bestDelta = Number.POSITIVE_INFINITY;
     for (const f of this.map.values()) {
       if (f.assetId !== assetId) continue;
       const d = Math.abs(f.timestampUs - targetUs);

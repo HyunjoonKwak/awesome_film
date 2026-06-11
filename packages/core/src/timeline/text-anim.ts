@@ -20,7 +20,7 @@ export const textAnimAt = (clip: TextClip, clipRelMs: Ms): TextAnimState => {
   const outAnim = clip.animOut ?? "none";
 
   let charFrac = 1;
-  let dx = 0;
+  const dx = 0;
   let dy = 0;
   let opacityMul = 1;
   let scaleMul = 1;

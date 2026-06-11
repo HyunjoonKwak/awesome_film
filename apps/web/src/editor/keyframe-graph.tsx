@@ -39,8 +39,8 @@ export function KeyframeGraph({ clipId, clip }: Props) {
 
   const range = useMemo(() => {
     if (!track || track.keyframes.length === 0) return { min: 0, max: 1 };
-    let min = Infinity;
-    let max = -Infinity;
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
     for (const k of track.keyframes) {
       min = Math.min(min, k.value);
       max = Math.max(max, k.value);
@@ -56,12 +56,12 @@ export function KeyframeGraph({ clipId, clip }: Props) {
   if (tracks.length === 0) {
     return (
       <InspectorSection title={t("kfgraph.title")}>
-        <p className="text-[11px] text-ink-3">{t("kfgraph.empty")}</p>
+        <p className="text-2xs text-ink-3">{t("kfgraph.empty")}</p>
         {clipboardTracks && clipboardTracks.length > 0 && (
           <button
             type="button"
             onClick={() => pasteKeyframes(clipId, clipboardTracks)}
-            className="flex items-center gap-1 rounded bg-panel-2 px-2 py-1 text-[11px] text-ink-3 hover:text-ink-1"
+            className="flex items-center gap-1 rounded bg-panel-2 px-2 py-1 text-2xs text-ink-3 hover:text-ink-1"
           >
             <ClipboardPaste className="size-3" />
             {t("kfgraph.paste")}
@@ -127,7 +127,7 @@ export function KeyframeGraph({ clipId, clip }: Props) {
           <select
             value={active ?? ""}
             onChange={(e) => setActive(e.target.value)}
-            className="rounded bg-white/5 px-1.5 py-0.5 text-[11px] text-ink-1 outline-none"
+            className="rounded bg-white/5 px-1.5 py-0.5 text-2xs text-ink-1 outline-none"
           >
             {tracks.map((tr) => (
               <option key={tr.target} value={tr.target} className="bg-panel-2">
@@ -177,7 +177,7 @@ export function KeyframeGraph({ clipId, clip }: Props) {
       {selectedKf && track && (
         <div className="space-y-2 rounded border border-white/5 bg-panel-2 p-2">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] text-ink-3">{t("kfgraph.easing")}</span>
+            <span className="text-2xs text-ink-3">{t("kfgraph.easing")}</span>
             <select
               value={selectedKf.easing}
               onChange={(e) => {
@@ -190,7 +190,7 @@ export function KeyframeGraph({ clipId, clip }: Props) {
                   next === "bezier" ? (selectedKf.bezier ?? DEFAULT_BEZIER) : undefined,
                 );
               }}
-              className="flex-1 rounded bg-white/5 px-1.5 py-0.5 text-[11px] text-ink-1 outline-none"
+              className="flex-1 rounded bg-white/5 px-1.5 py-0.5 text-2xs text-ink-1 outline-none"
             >
               {EASINGS.map((e) => (
                 <option key={e} value={e} className="bg-panel-2">
@@ -204,7 +204,7 @@ export function KeyframeGraph({ clipId, clip }: Props) {
               {(["x1", "y1", "x2", "y2"] as const).map((lbl, i) => {
                 const handles = selectedKf.bezier ?? DEFAULT_BEZIER;
                 return (
-                  <label key={lbl} className="flex flex-col gap-0.5 text-[9px] text-ink-3">
+                  <label key={lbl} className="flex flex-col gap-0.5 text-3xs text-ink-3">
                     {lbl}
                     <input
                       type="number"
@@ -217,7 +217,7 @@ export function KeyframeGraph({ clipId, clip }: Props) {
                         next[i] = i % 2 === 0 ? Math.max(0, Math.min(1, v)) : v;
                         setKeyframeEasing(clipId, track.target, selectedKf.at, "bezier", next);
                       }}
-                      className="w-full rounded bg-white/5 px-1 py-0.5 text-[10px] text-ink-1 outline-none"
+                      className="w-full rounded bg-white/5 px-1 py-0.5 text-3xs text-ink-1 outline-none"
                     />
                   </label>
                 );

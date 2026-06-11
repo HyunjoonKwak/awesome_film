@@ -54,7 +54,7 @@ export function ScopesPanel() {
             type="button"
             onClick={() => setKind(k)}
             className={cn(
-              "flex-1 px-2 py-1.5 text-[11px] uppercase tracking-wide transition",
+              "flex-1 px-2 py-1.5 text-2xs uppercase tracking-wide transition",
               kind === k ? "border-b-2 border-accent text-ink-1" : "text-ink-3 hover:text-ink-1",
             )}
           >

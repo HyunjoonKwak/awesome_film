@@ -24,7 +24,7 @@ export function ShapeSection({ clip }: Props) {
             key={s}
             type="button"
             onClick={() => update(id, { shape: s })}
-            className={`flex-1 rounded px-2 py-1 text-[11px] ${
+            className={`flex-1 rounded px-2 py-1 text-2xs ${
               clip.shape === s ? "bg-accent text-accent-fg" : "bg-panel-2 text-ink-3 hover:text-ink-1"
             }`}
           >
@@ -42,7 +42,7 @@ export function ShapeSection({ clip }: Props) {
         <button
           type="button"
           onClick={() => update(id, { fill: "transparent" })}
-          className="text-[10px] text-ink-3 hover:text-ink-1"
+          className="text-3xs text-ink-3 hover:text-ink-1"
         >
           {t("shape.noFill")}
         </button>
@@ -70,7 +70,7 @@ export function ShapeSection({ clip }: Props) {
           </Row>
           {clip.fillType === "linear" && (
             <div>
-              <div className="flex items-center justify-between text-[11px] text-ink-3">
+              <div className="flex items-center justify-between text-2xs text-ink-3">
                 <span>{t("shape.gradientAngle")}</span>
                 <span className="font-mono text-ink-1">{clip.gradientAngle ?? 0}°</span>
               </div>
@@ -81,7 +81,7 @@ export function ShapeSection({ clip }: Props) {
                 step={1}
                 value={clip.gradientAngle ?? 0}
                 onChange={(e) => update(id, { gradientAngle: Number(e.target.value) })}
-                className="mt-1 w-full accent-indigo-500"
+                className="mt-1 w-full accent-accent"
               />
             </div>
           )}
@@ -96,7 +96,7 @@ export function ShapeSection({ clip }: Props) {
         />
       </Row>
       <div>
-        <div className="flex items-center justify-between text-[11px] text-ink-3">
+        <div className="flex items-center justify-between text-2xs text-ink-3">
           <span>{t("shape.strokeWidth")}</span>
           <span className="font-mono text-ink-1">{clip.strokeWidth}</span>
         </div>
@@ -107,12 +107,12 @@ export function ShapeSection({ clip }: Props) {
           step={1}
           value={clip.strokeWidth}
           onChange={(e) => update(id, { strokeWidth: Number(e.target.value) })}
-          className="mt-1 w-full accent-indigo-500"
+          className="mt-1 w-full accent-accent"
         />
       </div>
       {clip.shape === "rect" && (
         <div>
-          <div className="flex items-center justify-between text-[11px] text-ink-3">
+          <div className="flex items-center justify-between text-2xs text-ink-3">
             <span>{t("shape.cornerRadius")}</span>
             <span className="font-mono text-ink-1">{clip.cornerRadius ?? 0}</span>
           </div>
@@ -123,7 +123,7 @@ export function ShapeSection({ clip }: Props) {
             step={1}
             value={clip.cornerRadius ?? 0}
             onChange={(e) => update(id, { cornerRadius: Number(e.target.value) })}
-            className="mt-1 w-full accent-indigo-500"
+            className="mt-1 w-full accent-accent"
           />
         </div>
       )}
@@ -134,7 +134,7 @@ export function ShapeSection({ clip }: Props) {
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="w-20 text-[11px] uppercase tracking-wide text-ink-3">{label}</span>
+      <span className="w-20 text-2xs uppercase tracking-wide text-ink-3">{label}</span>
       {children}
     </div>
   );

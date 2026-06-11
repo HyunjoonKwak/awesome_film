@@ -46,7 +46,7 @@ export function PreviewControls() {
             if (r) setResolution(r.w, r.h);
           }}
           title={t("preview.reframe")}
-          className="bg-transparent py-1 text-[11px] text-ink-1 outline-none"
+          className="bg-transparent py-1 text-2xs text-ink-1 outline-none"
         >
           {matched === "" && (
             <option value="" className="bg-panel-2">

@@ -4,7 +4,7 @@
 // considered — audio is mixed separately via WebAudio.
 
 // mp4box is loaded on demand — only paid when a video clip is decoded.
-import { VideoFrameCache } from "./video-frame-cache";
+import type { VideoFrameCache } from "./video-frame-cache";
 
 // mp4box.js ships without TS types we can rely on across versions; describe
 // only the surface we touch.

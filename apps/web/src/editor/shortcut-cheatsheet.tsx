@@ -52,7 +52,7 @@ export function ShortcutCheatsheet() {
             {SHORTCUTS.map((s) => (
               <li key={s.labelKey} className="flex items-center justify-between text-sm">
                 <span className="text-ink-2">{t(s.labelKey)}</span>
-                <kbd className="rounded border border-white/10 bg-panel-2 px-2 py-0.5 font-mono text-[11px] text-ink-1">
+                <kbd className="rounded border border-white/10 bg-panel-2 px-2 py-0.5 font-mono text-2xs text-ink-1">
                   {s.keys}
                 </kbd>
               </li>

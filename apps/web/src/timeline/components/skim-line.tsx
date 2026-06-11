@@ -47,7 +47,7 @@ export function SkimLine() {
           style={{ left: TRACK_HEADER_W + ms * zoom }}
           aria-hidden
         >
-          <span className="absolute left-1 top-0 rounded bg-panel-3 px-1 py-0.5 font-mono text-[10px] text-ink-2 shadow">
+          <span className="absolute left-1 top-0 rounded bg-panel-3 px-1 py-0.5 font-mono text-3xs text-ink-2 shadow">
             {formatTimecode(ms, fps)}
           </span>
         </div>

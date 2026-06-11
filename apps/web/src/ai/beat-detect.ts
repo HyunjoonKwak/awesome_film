@@ -37,7 +37,7 @@ export const detectBeatsFromBlob = async (
   const avgWin = Math.max(1, Math.floor(400 / 10));
   const minGapFrames = Math.max(1, Math.floor(minGapMs / 10));
   const beats: number[] = [];
-  let lastBeat = -Infinity;
+  let lastBeat = Number.NEGATIVE_INFINITY;
 
   for (let i = 1; i < frames.length - 1; i++) {
     const lo = Math.max(0, i - avgWin);

@@ -27,7 +27,7 @@ export function SlipSection({ clip }: Props) {
   return (
     <InspectorSection title={t("slip.title")} icon={<MoveHorizontal className="size-3" />}>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] text-ink-3">{t("fit.title")}</span>
+        <span className="text-2xs text-ink-3">{t("fit.title")}</span>
         <select
           value={clip.fit ?? "stretch"}
           onChange={(e) => setFit(clip.id, e.target.value as SpatialFit)}
@@ -40,7 +40,7 @@ export function SlipSection({ clip }: Props) {
           ))}
         </select>
       </div>
-      <div className="flex items-center justify-between text-[11px] text-ink-3">
+      <div className="flex items-center justify-between text-2xs text-ink-3">
         <span>{t("slip.sourceIn")}</span>
         <span className="font-mono text-ink-1">{Math.round(clip.trimIn)} ms</span>
       </div>
@@ -52,9 +52,9 @@ export function SlipSection({ clip }: Props) {
         value={Math.min(clip.trimIn, max)}
         disabled={max <= 0}
         onChange={(e) => slip(clip.id, Number(e.target.value) - clip.trimIn)}
-        className="w-full accent-indigo-500 disabled:opacity-40"
+        className="w-full accent-accent disabled:opacity-40"
       />
-      {max <= 0 && <p className="text-[10px] text-ink-3">{t("slip.noSlack")}</p>}
+      {max <= 0 && <p className="text-3xs text-ink-3">{t("slip.noSlack")}</p>}
     </InspectorSection>
   );
 }

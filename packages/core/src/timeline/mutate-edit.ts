@@ -87,7 +87,7 @@ export const moveClipOrGroup = (project: Project, clipId: ID, deltaMs: Ms): Proj
   const clip = all.find((c) => c.id === clipId);
   if (!clip || !clip.groupId) return moveClip(project, clipId, deltaMs);
   const members = all.filter((c) => c.groupId === clip.groupId);
-  const minStart = members.reduce((m, c) => Math.min(m, c.start), Infinity);
+  const minStart = members.reduce((m, c) => Math.min(m, c.start), Number.POSITIVE_INFINITY);
   const eff = Math.max(deltaMs, -minStart);
   const ids = new Set(members.map((c) => c.id));
   const tracks = project.timeline.tracks.map((t) => ({

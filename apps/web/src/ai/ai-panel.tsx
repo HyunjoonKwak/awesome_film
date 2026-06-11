@@ -304,7 +304,7 @@ export function AiPanel() {
       <button
         type="button"
         onClick={() => useTrackRegionStore.getState().setSelecting(true)}
-        className="flex w-full items-center gap-2 rounded-md border border-dashed border-white/10 bg-transparent px-3 py-1.5 text-[11px] text-ink-3 hover:border-accent hover:text-accent"
+        className="flex w-full items-center gap-2 rounded-md border border-dashed border-white/10 bg-transparent px-3 py-1.5 text-2xs text-ink-3 hover:border-accent hover:text-accent"
       >
         <Crosshair className="size-3" />
         {t("ai.track.drawRegion")}
@@ -334,7 +334,7 @@ function AiButton({ onClick, disabled, running, icon: Icon, label, badge, title 
     >
       {running ? <Loader2 className="size-4 animate-spin" /> : <Icon className="size-4 text-accent" />}
       <span className="flex-1 text-left">{label}</span>
-      <span className="text-[10px] text-ink-3">{badge}</span>
+      <span className="text-3xs text-ink-3">{badge}</span>
     </button>
   );
 }

@@ -13,8 +13,8 @@ const sine = (amp: number, freq: number, seconds: number, sr = 48_000): Float32A
 describe("measureLoudness", () => {
   it("reports -Infinity LUFS for digital silence", () => {
     const res = measureLoudness(new Float32Array(48_000), 48_000);
-    expect(res.integratedLufs).toBe(-Infinity);
-    expect(res.peakDbfs).toBe(-Infinity);
+    expect(res.integratedLufs).toBe(Number.NEGATIVE_INFINITY);
+    expect(res.peakDbfs).toBe(Number.NEGATIVE_INFINITY);
   });
 
   it("computes sample peak in dBFS", () => {

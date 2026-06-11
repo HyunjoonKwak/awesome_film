@@ -60,7 +60,7 @@ export function SpeedSection({ clipId, clip }: Props) {
         </button>
       }
     >
-      <div className="flex items-center justify-between text-[11px] text-ink-3">
+      <div className="flex items-center justify-between text-2xs text-ink-3">
         <span>{t("speed.constant")}</span>
         <span className="font-mono text-ink-1">{clip.speed.toFixed(2)}x</span>
       </div>
@@ -71,7 +71,7 @@ export function SpeedSection({ clipId, clip }: Props) {
         step={0.05}
         value={clip.speed}
         onChange={(e) => setClipSpeed(clipId, Number(e.target.value))}
-        className="w-full accent-indigo-500"
+        className="w-full accent-accent"
       />
       <div className="flex flex-wrap gap-1">
         {PRESETS.map((s) => (
@@ -79,7 +79,7 @@ export function SpeedSection({ clipId, clip }: Props) {
             key={s}
             type="button"
             onClick={() => setClipSpeed(clipId, s)}
-            className={`rounded px-1.5 py-0.5 text-[10px] ${
+            className={`rounded px-1.5 py-0.5 text-3xs ${
               Math.abs(clip.speed - s) < 0.001
                 ? "bg-accent text-accent-fg"
                 : "bg-panel-2 text-ink-3 hover:text-ink-1"
@@ -90,26 +90,26 @@ export function SpeedSection({ clipId, clip }: Props) {
         ))}
       </div>
       <div className="pt-1">
-        <div className="mb-1 text-[10px] uppercase tracking-wide text-ink-3">{t("speed.ramp")}</div>
+        <div className="mb-1 text-3xs uppercase tracking-wide text-ink-3">{t("speed.ramp")}</div>
         <div className="flex flex-wrap gap-1">
           <button
             type="button"
             onClick={() => applyRamp([[0, 0.4], [1, 2]])}
-            className="rounded bg-panel-2 px-1.5 py-0.5 text-[10px] text-ink-3 hover:text-ink-1"
+            className="rounded bg-panel-2 px-1.5 py-0.5 text-3xs text-ink-3 hover:text-ink-1"
           >
             {t("speed.rampUp")}
           </button>
           <button
             type="button"
             onClick={() => applyRamp([[0, 2], [1, 0.4]])}
-            className="rounded bg-panel-2 px-1.5 py-0.5 text-[10px] text-ink-3 hover:text-ink-1"
+            className="rounded bg-panel-2 px-1.5 py-0.5 text-3xs text-ink-3 hover:text-ink-1"
           >
             {t("speed.rampDown")}
           </button>
           <button
             type="button"
             onClick={() => applyRamp([[0, 1], [0.5, 0.25], [1, 1]])}
-            className="rounded bg-panel-2 px-1.5 py-0.5 text-[10px] text-ink-3 hover:text-ink-1"
+            className="rounded bg-panel-2 px-1.5 py-0.5 text-3xs text-ink-3 hover:text-ink-1"
           >
             {t("speed.rampDip")}
           </button>
@@ -117,7 +117,7 @@ export function SpeedSection({ clipId, clip }: Props) {
             <button
               type="button"
               onClick={() => clearKeyframeTrack(clipId, "speed")}
-              className="rounded bg-panel-2 px-1.5 py-0.5 text-[10px] text-ink-3 hover:text-red-400"
+              className="rounded bg-panel-2 px-1.5 py-0.5 text-3xs text-ink-3 hover:text-red-400"
             >
               {t("speed.rampClear")}
             </button>
@@ -125,14 +125,14 @@ export function SpeedSection({ clipId, clip }: Props) {
         </div>
       </div>
       {ramp && (
-        <p className="text-[10px] text-amber-400">{t("speed.rampActive")}</p>
+        <p className="text-3xs text-amber-400">{t("speed.rampActive")}</p>
       )}
 
       {isMediaClip(clip) && (
         <button
           type="button"
           onClick={() => toggleFreeze(clipId)}
-          className={`flex w-full items-center justify-center gap-1.5 rounded border px-2 py-1 text-[11px] ${
+          className={`flex w-full items-center justify-center gap-1.5 rounded border px-2 py-1 text-2xs ${
             frozen
               ? "border-sky-400/40 bg-sky-500/20 text-sky-200"
               : "border-white/5 bg-panel-2 text-ink-3 hover:border-accent hover:text-accent"

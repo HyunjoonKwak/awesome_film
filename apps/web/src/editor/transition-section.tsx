@@ -58,7 +58,7 @@ function TransitionRow({
   const t = useT();
   return (
     <div className="space-y-1">
-      <div className="text-[11px] uppercase tracking-wide text-ink-3">{label}</div>
+      <div className="text-2xs uppercase tracking-wide text-ink-3">{label}</div>
       <div className="flex items-center gap-1">
         <select
           value={value?.type ?? ""}
@@ -89,7 +89,7 @@ function TransitionRow({
             className="w-16 rounded bg-white/5 px-1 py-1 text-right text-xs text-ink-1 outline-none"
           />
         )}
-        {value && <span className="text-[10px] text-ink-3">ms</span>}
+        {value && <span className="text-3xs text-ink-3">ms</span>}
       </div>
     </div>
   );

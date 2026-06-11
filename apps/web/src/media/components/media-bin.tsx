@@ -156,7 +156,7 @@ export function MediaBin() {
                 type="button"
                 onClick={() => setFilter(k)}
                 className={cn(
-                  "rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wider",
+                  "rounded px-1.5 py-0.5 text-3xs uppercase tracking-wider",
                   filter === k
                     ? "bg-accent text-accent-fg"
                     : "text-ink-3 hover:text-ink-1",
@@ -232,12 +232,12 @@ export function MediaBin() {
                       </div>
                     )}
                     {asset.width && asset.height && (
-                      <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1 py-0.5 text-[9px] font-mono text-white">
+                      <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1 py-0.5 text-3xs font-mono text-white">
                         {asset.width}×{asset.height}
                       </span>
                     )}
                     {asset.proxyPath && (
-                      <span className="absolute bottom-1 left-1 rounded bg-accent/80 px-1 py-0.5 text-[9px] font-medium text-white">
+                      <span className="absolute bottom-1 left-1 rounded bg-accent/80 px-1 py-0.5 text-3xs font-medium text-white">
                         PROXY
                       </span>
                     )}
@@ -297,7 +297,7 @@ export function MediaBin() {
       </div>
 
       {usage && usage.quotaBytes > 0 && (
-        <div className="border-t border-white/5 px-2 py-1.5 text-[10px] text-ink-3">
+        <div className="border-t border-white/5 px-2 py-1.5 text-3xs text-ink-3">
           <div className="flex justify-between">
             <span>{t("media.storage")}</span>
             <span className="font-mono">

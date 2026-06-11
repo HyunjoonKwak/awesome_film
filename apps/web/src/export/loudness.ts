@@ -68,13 +68,13 @@ export const measureLoudness = (
     const a = Math.abs(pcm[i]!);
     if (a > peak) peak = a;
   }
-  const peakDbfs = peak > 0 ? 20 * Math.log10(peak) : -Infinity;
+  const peakDbfs = peak > 0 ? 20 * Math.log10(peak) : Number.NEGATIVE_INFINITY;
 
   const weighted = biquad(biquad(pcm, PRE), RLB);
   const blockLen = Math.round(BLOCK_SECONDS * sampleRate);
   const step = Math.max(1, Math.round(blockLen * (1 - OVERLAP)));
   if (weighted.length < blockLen) {
-    return { integratedLufs: -Infinity, peakDbfs };
+    return { integratedLufs: Number.NEGATIVE_INFINITY, peakDbfs };
   }
 
   // Mean square per block.
@@ -92,13 +92,13 @@ export const measureLoudness = (
 
   // Absolute gating at -70 LUFS.
   const absKept = meanSquares.filter((ms) => ms > 0 && loudnessOf(ms) >= ABSOLUTE_GATE);
-  if (absKept.length === 0) return { integratedLufs: -Infinity, peakDbfs };
+  if (absKept.length === 0) return { integratedLufs: Number.NEGATIVE_INFINITY, peakDbfs };
 
   // Relative threshold from the absolute-gated mean.
   const absMean = absKept.reduce((s, v) => s + v, 0) / absKept.length;
   const relThreshold = loudnessOf(absMean) + RELATIVE_GATE;
   const relKept = absKept.filter((ms) => loudnessOf(ms) >= relThreshold);
-  if (relKept.length === 0) return { integratedLufs: -Infinity, peakDbfs };
+  if (relKept.length === 0) return { integratedLufs: Number.NEGATIVE_INFINITY, peakDbfs };
 
   const relMean = relKept.reduce((s, v) => s + v, 0) / relKept.length;
   return { integratedLufs: loudnessOf(relMean), peakDbfs };

@@ -29,12 +29,12 @@ export function MaskSection({ clipId, clip }: Props) {
     <InspectorSection
       title={t("mask.title")}
       headerExtra={
-        <label className="flex items-center gap-1 text-[11px] text-ink-3">
+        <label className="flex items-center gap-1 text-2xs text-ink-3">
           <input
             type="checkbox"
             checked={!!mask}
             onChange={(e) => setMask(clipId, e.target.checked ? DEFAULT_MASK : undefined)}
-            className="accent-indigo-500"
+            className="accent-accent"
           />
           {t("mask.enable")}
         </label>
@@ -48,7 +48,7 @@ export function MaskSection({ clipId, clip }: Props) {
                 key={s}
                 type="button"
                 onClick={() => setMask(clipId, { ...mask, shape: s })}
-                className={`flex-1 rounded px-2 py-1 text-[11px] ${
+                className={`flex-1 rounded px-2 py-1 text-2xs ${
                   mask.shape === s ? "bg-accent text-accent-fg" : "bg-panel-2 text-ink-3 hover:text-ink-1"
                 }`}
               >
@@ -66,12 +66,12 @@ export function MaskSection({ clipId, clip }: Props) {
             max={0.5}
             onChange={(feather) => setMask(clipId, { ...mask, feather })}
           />
-          <label className="flex items-center gap-2 text-[11px] text-ink-3">
+          <label className="flex items-center gap-2 text-2xs text-ink-3">
             <input
               type="checkbox"
               checked={mask.inverted}
               onChange={(e) => setMask(clipId, { ...mask, inverted: e.target.checked })}
-              className="accent-indigo-500"
+              className="accent-accent"
             />
             {t("mask.invert")}
           </label>
@@ -94,7 +94,7 @@ function Slider({
 }) {
   return (
     <div>
-      <div className="flex items-center justify-between text-[11px] text-ink-3">
+      <div className="flex items-center justify-between text-2xs text-ink-3">
         <span>{label}</span>
         <span className="font-mono text-ink-1">{v.toFixed(2)}</span>
       </div>
@@ -105,7 +105,7 @@ function Slider({
         step={0.01}
         value={v}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="mt-1 w-full accent-indigo-500"
+        className="mt-1 w-full accent-accent"
       />
     </div>
   );

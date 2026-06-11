@@ -98,7 +98,7 @@ export function SubtitlePanel() {
         <div className="flex items-center gap-1">
           <button
             type="button"
-            className="btn-ghost px-1.5 py-0.5 text-[11px]"
+            className="btn-ghost px-1.5 py-0.5 text-2xs"
             onClick={() => inputRef.current?.click()}
             title={t("subs.import")}
           >
@@ -107,7 +107,7 @@ export function SubtitlePanel() {
           </button>
           <button
             type="button"
-            className="btn-ghost px-1.5 py-0.5 text-[11px]"
+            className="btn-ghost px-1.5 py-0.5 text-2xs"
             onClick={onExportSrt}
             title={t("subs.exportSrt")}
           >
@@ -116,7 +116,7 @@ export function SubtitlePanel() {
           </button>
           <button
             type="button"
-            className="btn-ghost px-1.5 py-0.5 text-[11px]"
+            className="btn-ghost px-1.5 py-0.5 text-2xs"
             onClick={onExportVtt}
             title={t("subs.exportVtt")}
           >
@@ -124,7 +124,7 @@ export function SubtitlePanel() {
             VTT
           </button>
           <select
-            className="btn-ghost px-1.5 py-0.5 text-[11px]"
+            className="btn-ghost px-1.5 py-0.5 text-2xs"
             title={t("subs.burnInTitle")}
             defaultValue=""
             onChange={(e) => {
@@ -156,7 +156,7 @@ export function SubtitlePanel() {
                   key={c.id}
                   className="group rounded-md border border-white/5 bg-panel-2 p-2 text-xs"
                 >
-                  <div className="mb-1 flex items-center justify-between font-mono text-[10px] text-ink-3">
+                  <div className="mb-1 flex items-center justify-between font-mono text-3xs text-ink-3">
                     <span>
                       {formatTimecode(c.start, fps)} → {formatTimecode(c.start + c.duration, fps)}
                     </span>

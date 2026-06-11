@@ -25,8 +25,21 @@ const config: Config = {
         },
         accent: {
           DEFAULT: "#6366f1", // indigo-500
+          hover: "#818cf8", // indigo-400
           fg: "#ffffff",
         },
+        // Timeline clip categories — keep in sync with timeline-clip.tsx.
+        clip: {
+          media: "#6366f1", // indigo-500
+          adjustment: "#10b981", // emerald-500
+          overlay: "#f59e0b", // amber-500
+        },
+      },
+      fontSize: {
+        // Editor micro-typography: panel labels and badges sit below
+        // Tailwind's default xs (12px).
+        "2xs": ["11px", { lineHeight: "14px" }],
+        "3xs": ["10px", { lineHeight: "12px" }],
       },
       borderRadius: {
         xl: "10px",

@@ -147,10 +147,10 @@ export function TimelineClip({ clip, trackHeight, trackLocked }: Props) {
         "absolute top-1 select-none overflow-hidden rounded-md border text-xs",
         "transition-shadow",
         isMedia
-          ? "border-indigo-400/30 bg-indigo-500/20 hover:bg-indigo-500/30"
+          ? "border-clip-media/40 bg-clip-media/20 hover:bg-clip-media/30"
           : isAdjustment
-            ? "border-emerald-400/30 bg-emerald-500/20 hover:bg-emerald-500/30"
-            : "border-amber-400/30 bg-amber-500/20 hover:bg-amber-500/30",
+            ? "border-clip-adjustment/40 bg-clip-adjustment/20 hover:bg-clip-adjustment/30"
+            : "border-clip-overlay/40 bg-clip-overlay/20 hover:bg-clip-overlay/30",
         isSelected && "ring-2 ring-accent shadow-lg",
         clip.disabled && "opacity-40 grayscale",
         clip.groupId && "outline-dashed outline-1 outline-sky-300/50",

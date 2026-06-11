@@ -108,7 +108,7 @@ export function TransformSection({ clipId, clip }: Props) {
         onToggleKey={() => toggleKeyframe("transform.opacity", tf.opacity)}
       />
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] text-ink-3">{t("transform.blend")}</span>
+        <span className="text-2xs text-ink-3">{t("transform.blend")}</span>
         <select
           value={clip.blendMode ?? "normal"}
           onChange={(e) => setBlendMode(clipId, e.target.value as BlendMode)}
@@ -122,7 +122,7 @@ export function TransformSection({ clipId, clip }: Props) {
         </select>
       </div>
       <div>
-        <div className="mb-1 text-[10px] uppercase tracking-wide text-ink-3">{t("transform.pip")}</div>
+        <div className="mb-1 text-3xs uppercase tracking-wide text-ink-3">{t("transform.pip")}</div>
         <div className="grid grid-cols-4 gap-1">
           {PIP_PRESETS.map((p) => (
             <button
@@ -130,7 +130,7 @@ export function TransformSection({ clipId, clip }: Props) {
               type="button"
               onClick={() => setTransform(clipId, { x: p.x, y: p.y, scale: p.scale })}
               title={t(`transform.${p.key}`)}
-              className="rounded bg-panel-2 px-1 py-1 text-[10px] text-ink-3 hover:bg-white/10 hover:text-ink-1"
+              className="rounded bg-panel-2 px-1 py-1 text-3xs text-ink-3 hover:bg-white/10 hover:text-ink-1"
             >
               {p.glyph}
             </button>
@@ -142,7 +142,7 @@ export function TransformSection({ clipId, clip }: Props) {
         onClick={() =>
           setTransform(clipId, { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 })
         }
-        className="w-full rounded border border-white/5 bg-panel-2 px-2 py-1 text-[11px] text-ink-3 hover:border-accent hover:text-accent"
+        className="w-full rounded border border-white/5 bg-panel-2 px-2 py-1 text-2xs text-ink-3 hover:border-accent hover:text-accent"
       >
         {t("transform.reset")}
       </button>
@@ -175,7 +175,7 @@ function NumRow({
 }) {
   return (
     <div>
-      <div className="flex items-center justify-between text-[11px] text-ink-3">
+      <div className="flex items-center justify-between text-2xs text-ink-3">
         <span className="flex items-center gap-1">
           <button
             type="button"
@@ -209,7 +209,7 @@ function NumRow({
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="mt-1 w-full accent-indigo-500"
+        className="mt-1 w-full accent-accent"
       />
     </div>
   );

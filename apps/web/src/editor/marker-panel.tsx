@@ -70,14 +70,14 @@ export function MarkerPanel() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-2">
-        {sorted.length === 0 && <p className="px-1 text-[11px] text-ink-3">{t("marker.empty")}</p>}
+        {sorted.length === 0 && <p className="px-1 text-2xs text-ink-3">{t("marker.empty")}</p>}
         <ul className="space-y-1">
           {sorted.map((m) => (
             <li key={m.id} className="flex items-center gap-2 rounded bg-panel-2 px-2 py-1.5">
               <button
                 type="button"
                 onClick={() => setPlayheadMs(m.at)}
-                className="shrink-0 font-mono text-[11px] text-accent hover:underline"
+                className="shrink-0 font-mono text-2xs text-accent hover:underline"
                 title={t("marker.jump")}
               >
                 {stamp(m.at)}

@@ -127,7 +127,7 @@ function SaveBadge({ state, lastSavedAt }: { state: string; lastSavedAt: number 
   const Icon = state === "saving" ? Loader2 : state === "saved" ? Check : Cloud;
   return (
     <span
-      className="ml-2 inline-flex items-center gap-1 rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-ink-3"
+      className="ml-2 inline-flex items-center gap-1 rounded-full bg-white/5 px-2 py-0.5 text-3xs text-ink-3"
       title={state}
     >
       <Icon className={state === "saving" ? "size-3 animate-spin" : "size-3"} />

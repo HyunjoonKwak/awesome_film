@@ -33,7 +33,7 @@ export function ProjectInspectorPanel() {
       </div>
       <div className="flex-1 overflow-y-auto p-2">
         {issues.length === 0 ? (
-          <div className="flex items-center gap-2 px-1 text-[11px] text-emerald-400">
+          <div className="flex items-center gap-2 px-1 text-2xs text-emerald-400">
             <CheckCircle2 className="size-3.5" />
             {t("inspect.clean")}
           </div>
@@ -44,7 +44,7 @@ export function ProjectInspectorPanel() {
               return (
                 <li
                   key={i}
-                  className={`flex items-start gap-2 rounded px-2 py-1.5 text-[11px] ${
+                  className={`flex items-start gap-2 rounded px-2 py-1.5 text-2xs ${
                     issue.clipId ? "cursor-pointer hover:bg-white/5" : ""
                   }`}
                   onClick={() => issue.clipId && select(issue.clipId as ID)}

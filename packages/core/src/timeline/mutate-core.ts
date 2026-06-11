@@ -76,7 +76,11 @@ export const updateClip = (
 ): Project => {
   let touched = false;
   const tracks = project.timeline.tracks.map((t) => {
-    const next = t.clips.map((c) => (c.id === clipId ? ((touched = true), patch(c)) : c));
+    const next = t.clips.map((c) => {
+      if (c.id !== clipId) return c;
+      touched = true;
+      return patch(c);
+    });
     return touched ? { ...t, clips: next.toSorted((a, b) => a.start - b.start) } : t;
   });
   if (!touched) return project;

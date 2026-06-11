@@ -167,13 +167,13 @@ export function EffectsSection({ clipId, effects }: Props) {
       title={t("effects.title")}
       headerExtra={
         <details className="relative">
-          <summary className="btn-ghost cursor-pointer list-none px-1.5 py-0.5 text-[11px]">
+          <summary className="btn-ghost cursor-pointer list-none px-1.5 py-0.5 text-2xs">
             <Plus className="size-3" /> {t("effects.add")}
           </summary>
           <div className="absolute right-0 z-30 mt-1 max-h-80 w-56 overflow-y-auto rounded-md border border-white/10 bg-panel-3 p-1 shadow-lg">
             {grouped.map(({ category, items }) => (
               <div key={category} className="mb-1">
-                <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-ink-3">
+                <div className="px-2 py-1 text-3xs uppercase tracking-wider text-ink-3">
                   {CATEGORY_KEY[category] ? t(CATEGORY_KEY[category]!) : category}
                 </div>
                 {items.map((d) => (
@@ -214,7 +214,7 @@ export function EffectsSection({ clipId, effects }: Props) {
                     type="checkbox"
                     checked={fx.enabled}
                     onChange={() => toggleEffect(clipId, fx.id)}
-                    className="accent-indigo-500"
+                    className="accent-accent"
                   />
                   <span className="font-medium text-ink-1">{effectName(t, def)}</span>
                 </label>
@@ -233,7 +233,7 @@ export function EffectsSection({ clipId, effects }: Props) {
                     const v = Number(fx.params[p.key] ?? p.default);
                     return (
                       <div key={p.key}>
-                        <div className="flex items-center justify-between text-[11px] text-ink-3">
+                        <div className="flex items-center justify-between text-2xs text-ink-3">
                           <span>{paramLabel(t, def.type, p)}</span>
                           <span className="font-mono text-ink-1">{v.toFixed(2)}</span>
                         </div>
@@ -244,7 +244,7 @@ export function EffectsSection({ clipId, effects }: Props) {
                           step={p.step}
                           value={v}
                           onChange={(e) => setParam(clipId, fx.id, p.key, Number(e.target.value))}
-                          className="mt-1 w-full accent-indigo-500"
+                          className="mt-1 w-full accent-accent"
                         />
                       </div>
                     );
@@ -253,7 +253,7 @@ export function EffectsSection({ clipId, effects }: Props) {
                     const v = String(fx.params[p.key] ?? p.default);
                     return (
                       <div key={p.key} className="flex items-center gap-2">
-                        <span className="flex-1 text-[11px] text-ink-3">{p.label}</span>
+                        <span className="flex-1 text-2xs text-ink-3">{p.label}</span>
                         <input
                           type="color"
                           value={v}
@@ -266,12 +266,12 @@ export function EffectsSection({ clipId, effects }: Props) {
                   if (p.kind === "boolean") {
                     const v = Boolean(fx.params[p.key] ?? p.default);
                     return (
-                      <label key={p.key} className="flex items-center gap-2 text-[11px] text-ink-3">
+                      <label key={p.key} className="flex items-center gap-2 text-2xs text-ink-3">
                         <input
                           type="checkbox"
                           checked={v}
                           onChange={(e) => setParam(clipId, fx.id, p.key, e.target.checked)}
-                          className="accent-indigo-500"
+                          className="accent-accent"
                         />
                         {p.label}
                       </label>
@@ -290,7 +290,7 @@ export function EffectsSection({ clipId, effects }: Props) {
                     const v = String(fx.params[p.key] ?? p.default);
                     return (
                       <div key={p.key} className="flex items-center gap-2">
-                        <span className="flex-1 text-[11px] text-ink-3">{p.label}</span>
+                        <span className="flex-1 text-2xs text-ink-3">{p.label}</span>
                         <select
                           value={v}
                           onChange={(e) => setParam(clipId, fx.id, p.key, e.target.value)}

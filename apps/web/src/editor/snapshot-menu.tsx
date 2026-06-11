@@ -97,7 +97,7 @@ export function SnapshotMenu() {
               >
                 <div className="flex-1">
                   <span className="block text-sm text-ink-1">{row.label}</span>
-                  <span className="block text-[10px] text-ink-3">
+                  <span className="block text-3xs text-ink-3">
                     {new Date(row.createdAt).toLocaleString()}
                   </span>
                 </div>

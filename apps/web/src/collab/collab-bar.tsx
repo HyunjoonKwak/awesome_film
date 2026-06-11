@@ -42,7 +42,7 @@ export function CollabBar() {
           .map((p) => (
             <span
               key={p.id}
-              className="inline-flex size-5 items-center justify-center rounded-full border border-panel-1 text-[10px] font-medium text-white"
+              className="inline-flex size-5 items-center justify-center rounded-full border border-panel-1 text-3xs font-medium text-white"
               style={{ backgroundColor: p.color }}
               title={p.name}
             >

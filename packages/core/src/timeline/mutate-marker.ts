@@ -33,7 +33,11 @@ export const updateMarker = (
   const cur = project.timeline.markers ?? [];
   let touched = false;
   const next = cur
-    .map((m) => (m.id === markerId ? ((touched = true), { ...m, ...patch }) : m))
+    .map((m) => {
+      if (m.id !== markerId) return m;
+      touched = true;
+      return { ...m, ...patch };
+    })
     .sort((a, b) => a.at - b.at);
   if (!touched) return project;
   return withMarkers(project, next);

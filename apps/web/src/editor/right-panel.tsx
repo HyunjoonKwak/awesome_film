@@ -90,7 +90,7 @@ function TabButton({
       title={label}
       aria-label={label}
       className={cn(
-        "flex flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-2 text-[11px] transition",
+        "flex flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-2 text-2xs transition",
         active
           ? "border-accent text-ink-1"
           : "border-transparent text-ink-3 hover:text-ink-1",

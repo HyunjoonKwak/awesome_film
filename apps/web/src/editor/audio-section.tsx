@@ -46,7 +46,7 @@ export function AudioSection({ clip }: Props) {
         </button>
       }
     >
-      <div className="flex items-center justify-between text-[11px] text-ink-3">
+      <div className="flex items-center justify-between text-2xs text-ink-3">
         <span>{t("audio.volume")}</span>
         <span className="font-mono text-ink-1">{Math.round(vol * 100)}%</span>
       </div>
@@ -57,7 +57,7 @@ export function AudioSection({ clip }: Props) {
         step={0.01}
         value={vol}
         onChange={(e) => setVolume(clip.id, Number(e.target.value))}
-        className="w-full accent-indigo-500"
+        className="w-full accent-accent"
       />
     </InspectorSection>
   );

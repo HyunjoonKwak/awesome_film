@@ -86,7 +86,7 @@ export function TimelinePanel() {
           <span className="text-xs uppercase tracking-wider text-ink-3">{t("timeline.title")}</span>
           <button
             type="button"
-            className="btn-ghost px-1.5 py-0.5 text-[11px]"
+            className="btn-ghost px-1.5 py-0.5 text-2xs"
             onClick={() => addNewTrack("video")}
             title={t("timeline.addVideoTrack")}
           >
@@ -94,7 +94,7 @@ export function TimelinePanel() {
           </button>
           <button
             type="button"
-            className="btn-ghost px-1.5 py-0.5 text-[11px]"
+            className="btn-ghost px-1.5 py-0.5 text-2xs"
             onClick={() => addNewTrack("audio")}
             title={t("timeline.addAudioTrack")}
           >
@@ -102,14 +102,14 @@ export function TimelinePanel() {
           </button>
           <button
             type="button"
-            className="btn-ghost px-1.5 py-0.5 text-[11px]"
+            className="btn-ghost px-1.5 py-0.5 text-2xs"
             onClick={() => useProjectStore.getState().addTextClipAtPlayhead("Title")}
             title={t("timeline.addTextClip")}
           >
             <Plus className="size-3" /> T
           </button>
           <details className="relative">
-            <summary className="btn-ghost cursor-pointer list-none px-1.5 py-0.5 text-[11px]">
+            <summary className="btn-ghost cursor-pointer list-none px-1.5 py-0.5 text-2xs">
               <Plus className="size-3" /> {t("timeline.shape")}
             </summary>
             <div className="absolute left-0 z-30 mt-1 w-32 rounded-md border border-white/10 bg-panel-3 p-1 shadow-lg">
@@ -126,7 +126,7 @@ export function TimelinePanel() {
             </div>
           </details>
           <details className="relative">
-            <summary className="btn-ghost cursor-pointer list-none px-1.5 py-0.5 text-[11px]">
+            <summary className="btn-ghost cursor-pointer list-none px-1.5 py-0.5 text-2xs">
               <Plus className="size-3" /> {t("timeline.titleTpl")}
             </summary>
             <div className="absolute left-0 z-30 mt-1 w-36 rounded-md border border-white/10 bg-panel-3 p-1 shadow-lg">
@@ -144,7 +144,7 @@ export function TimelinePanel() {
           </details>
           <button
             type="button"
-            className="btn-ghost px-1.5 py-0.5 text-[11px]"
+            className="btn-ghost px-1.5 py-0.5 text-2xs"
             onClick={() => useProjectStore.getState().addAdjustmentClipAtPlayhead()}
             title={t("timeline.addAdjustment")}
           >
@@ -153,7 +153,7 @@ export function TimelinePanel() {
           <div className="mx-1 h-4 w-px bg-white/10" />
           <button
             type="button"
-            className="btn-ghost px-1.5 py-0.5 text-[11px]"
+            className="btn-ghost px-1.5 py-0.5 text-2xs"
             onClick={() => useRangeStore.getState().setIn(useProjectStore.getState().project.timeline.playhead)}
             title={t("range.setIn")}
           >
@@ -161,7 +161,7 @@ export function TimelinePanel() {
           </button>
           <button
             type="button"
-            className="btn-ghost px-1.5 py-0.5 text-[11px]"
+            className="btn-ghost px-1.5 py-0.5 text-2xs"
             onClick={() => useRangeStore.getState().setOut(useProjectStore.getState().project.timeline.playhead)}
             title={t("range.setOut")}
           >
@@ -170,7 +170,7 @@ export function TimelinePanel() {
           {hasRange && (
             <button
               type="button"
-              className="btn-ghost px-1.5 py-0.5 text-[11px] text-ink-3"
+              className="btn-ghost px-1.5 py-0.5 text-2xs text-ink-3"
               onClick={() => useRangeStore.getState().clear()}
               title={t("range.clear")}
             >

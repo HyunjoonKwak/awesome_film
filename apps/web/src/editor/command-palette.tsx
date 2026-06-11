@@ -112,7 +112,7 @@ export function CommandPalette() {
                   }
                 }}
               />
-              <kbd className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-ink-3">esc</kbd>
+              <kbd className="rounded bg-white/5 px-1.5 py-0.5 text-3xs text-ink-3">esc</kbd>
             </div>
             <ul className="max-h-72 overflow-y-auto p-1">
               {filtered.map((a) => (
@@ -127,7 +127,7 @@ export function CommandPalette() {
                   >
                     {a.label}
                     {a.hint && (
-                      <kbd className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-ink-3">
+                      <kbd className="rounded bg-white/5 px-1.5 py-0.5 text-3xs text-ink-3">
                         {a.hint}
                       </kbd>
                     )}

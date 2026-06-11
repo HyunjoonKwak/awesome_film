@@ -51,7 +51,7 @@
            font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none;
   }
   .btn-primary {
-    @apply btn bg-accent text-accent-fg hover:bg-indigo-400;
+    @apply btn bg-accent text-accent-fg hover:bg-accent-hover;
   }
   .btn-ghost {
     @apply btn text-ink-2 hover:bg-white/5 hover:text-ink-1;
