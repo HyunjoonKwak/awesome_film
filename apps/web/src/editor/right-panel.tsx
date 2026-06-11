@@ -69,6 +69,9 @@ export function RightPanel() {
   );
 }
 
+// Icon-only tabs — six labels don't fit a ~300px panel without wrapping.
+// The label lives in the tooltip/aria-label, and the active tab shows it
+// inline since the active state frees up the most attention.
 function TabButton({
   active,
   onClick,
@@ -84,15 +87,17 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
+      title={label}
+      aria-label={label}
       className={cn(
-        "flex flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-2 text-[11px] uppercase tracking-wider transition",
+        "flex flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-2 text-[11px] transition",
         active
           ? "border-accent text-ink-1"
           : "border-transparent text-ink-3 hover:text-ink-1",
       )}
     >
       {icon}
-      {label}
+      {active && <span className="truncate uppercase tracking-wider">{label}</span>}
     </button>
   );
 }

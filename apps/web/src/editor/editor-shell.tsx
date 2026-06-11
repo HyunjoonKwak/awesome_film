@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { FolderOpen, Sliders, X } from "lucide-react";
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { TopBar } from "./top-bar";
 import { MediaBin } from "@/media/components/media-bin";
 import { PreviewViewport } from "@/preview/preview-viewport";
@@ -10,42 +11,95 @@ import { TimelinePanel } from "@/timeline/components/timeline-panel";
 import { InspectorPanel } from "./inspector-panel";
 import { RightPanel } from "./right-panel";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import { useGlobalFileDrop } from "@/hooks/use-global-file-drop";
+import { useIsDesktopApp } from "@/hooks/use-is-desktop-app";
 import { useCollab } from "@/collab/use-collab";
 import { useIsBelow } from "@/hooks/use-breakpoint";
+import { cn } from "@/lib/cn";
 import { usePluginHost } from "@/plugins/use-plugin-host";
 import { CommandPalette } from "./command-palette";
 import { ShortcutCheatsheet } from "./shortcut-cheatsheet";
 
 export function EditorShell() {
   useKeyboardShortcuts();
+  useGlobalFileDrop();
   useCollab();
   usePluginHost();
   const isMobile = useIsBelow(900);
+  const isDesktopApp = useIsDesktopApp();
 
   if (isMobile) return <MobileShell />;
   return (
-    <div className="grid h-full grid-rows-[44px_1fr_36px_280px] grid-cols-[280px_1fr_320px] bg-panel-0 text-ink-1">
+    <div className="flex h-full flex-col bg-panel-0 text-ink-1">
       <CommandPalette />
       <ShortcutCheatsheet />
-      <header className="col-span-3 border-b border-white/5 bg-panel-1">
+      <header
+        className={cn(
+          "h-11 shrink-0 border-b border-white/5 bg-panel-1",
+          // Electron hiddenInset window: leave room for the traffic lights
+          // and let the bar double as the draggable title bar.
+          isDesktopApp && "app-region-drag pl-[72px]",
+        )}
+      >
         <TopBar />
       </header>
-      <aside className="col-start-1 border-r border-white/5 overflow-hidden">
-        <MediaBin />
-      </aside>
-      <main className="col-start-2 overflow-hidden bg-black">
-        <PreviewViewport />
-      </main>
-      <aside className="col-start-3 border-l border-white/5 overflow-hidden">
-        <RightPanel />
-      </aside>
-      <section className="col-span-3 border-t border-white/5 bg-panel-1">
-        <TransportBar />
-      </section>
-      <section className="col-span-3 overflow-hidden border-t border-white/5">
-        <TimelinePanel />
-      </section>
+      {/* Resizable workspace, FCP-style: browser | viewer | inspector on
+          top, timeline below. Split ratios persist via autoSaveId. */}
+      <PanelGroup direction="vertical" autoSaveId="cut:layout-rows" className="flex-1">
+        <Panel defaultSize={62} minSize={30}>
+          <PanelGroup direction="horizontal" autoSaveId="cut:layout-cols">
+            <Panel
+              defaultSize={18}
+              minSize={12}
+              collapsible
+              collapsedSize={0}
+              className="overflow-hidden border-r border-white/5"
+            >
+              <MediaBin />
+            </Panel>
+            <ResizeHandle orientation="vertical" />
+            <Panel minSize={30}>
+              <main className="flex h-full flex-col overflow-hidden bg-black">
+                <div className="min-h-0 flex-1">
+                  <PreviewViewport />
+                </div>
+                {/* Transport controls live with the viewer, FCP-style. */}
+                <div className="h-10 shrink-0 border-t border-white/5 bg-panel-1">
+                  <TransportBar />
+                </div>
+              </main>
+            </Panel>
+            <ResizeHandle orientation="vertical" />
+            <Panel
+              defaultSize={20}
+              minSize={14}
+              collapsible
+              collapsedSize={0}
+              className="overflow-hidden border-l border-white/5"
+            >
+              <RightPanel />
+            </Panel>
+          </PanelGroup>
+        </Panel>
+        <ResizeHandle orientation="horizontal" />
+        <Panel defaultSize={38} minSize={15} className="overflow-hidden border-t border-white/5">
+          <TimelinePanel />
+        </Panel>
+      </PanelGroup>
     </div>
+  );
+}
+
+// Slim divider that widens its hit area on hover and highlights while
+// dragging. `orientation` refers to the divider line itself.
+function ResizeHandle({ orientation }: { orientation: "vertical" | "horizontal" }) {
+  return (
+    <PanelResizeHandle
+      className={cn(
+        "bg-white/5 transition-colors hover:bg-accent/60 data-[resize-handle-active]:bg-accent",
+        orientation === "vertical" ? "w-[3px]" : "h-[3px]",
+      )}
+    />
   );
 }
 

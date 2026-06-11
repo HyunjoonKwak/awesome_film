@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { isMediaClip, type ID } from "@cut/core";
 import { useProjectStore } from "@/stores/project-store";
 import { useSelectionStore } from "@/stores/selection-store";
+import { InspectorSection } from "@/components/inspector-section";
 import { readMediaFile } from "@/persistence/opfs";
 import { useT, t as tFn } from "@/i18n/use-t";
 import { detectSilenceFromBlob } from "./silence-detect";
@@ -232,11 +233,11 @@ export function AiPanel() {
     });
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-ink-3">
-        <Sparkles className="size-3" />
-        {t("ai.title")}
-      </div>
+    <InspectorSection
+      title={t("ai.title")}
+      icon={<Sparkles className="size-3" />}
+      defaultOpen={false}
+    >
       <AiButton
         onClick={runAutoSilenceCut}
         disabled={!firstSelected || running !== null}
@@ -308,7 +309,7 @@ export function AiPanel() {
         <Crosshair className="size-3" />
         {t("ai.track.drawRegion")}
       </button>
-    </div>
+    </InspectorSection>
   );
 }
 

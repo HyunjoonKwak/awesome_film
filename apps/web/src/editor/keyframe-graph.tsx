@@ -6,6 +6,7 @@ import { sampleKeyframeTrack } from "@cut/core";
 import { Copy, ClipboardPaste } from "lucide-react";
 import { useProjectStore, selectPlayhead } from "@/stores/project-store";
 import { useKeyframeClipboard } from "@/stores/keyframe-clipboard-store";
+import { InspectorSection } from "@/components/inspector-section";
 import { useT } from "@/i18n/use-t";
 
 interface Props {
@@ -54,7 +55,7 @@ export function KeyframeGraph({ clipId, clip }: Props) {
 
   if (tracks.length === 0) {
     return (
-      <div className="space-y-2">
+      <InspectorSection title={t("kfgraph.title")}>
         <p className="text-[11px] text-ink-3">{t("kfgraph.empty")}</p>
         {clipboardTracks && clipboardTracks.length > 0 && (
           <button
@@ -66,7 +67,7 @@ export function KeyframeGraph({ clipId, clip }: Props) {
             {t("kfgraph.paste")}
           </button>
         )}
-      </div>
+      </InspectorSection>
     );
   }
 
@@ -102,9 +103,9 @@ export function KeyframeGraph({ clipId, clip }: Props) {
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between gap-1">
-        <span className="text-xs uppercase tracking-wider text-ink-3">{t("kfgraph.title")}</span>
+    <InspectorSection
+      title={t("kfgraph.title")}
+      headerExtra={
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -135,7 +136,8 @@ export function KeyframeGraph({ clipId, clip }: Props) {
             ))}
           </select>
         </div>
-      </div>
+      }
+    >
       <svg
         viewBox={`0 0 ${GRAPH_W} ${GRAPH_H}`}
         className="w-full rounded border border-white/5 bg-panel-2"
@@ -224,6 +226,6 @@ export function KeyframeGraph({ clipId, clip }: Props) {
           )}
         </div>
       )}
-    </div>
+    </InspectorSection>
   );
 }

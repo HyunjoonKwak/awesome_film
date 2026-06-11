@@ -2,6 +2,7 @@
 
 import type { Clip, ID, ClipMask } from "@cut/core";
 import { useProjectStore } from "@/stores/project-store";
+import { InspectorSection } from "@/components/inspector-section";
 import { useT } from "@/i18n/use-t";
 
 interface Props {
@@ -25,9 +26,9 @@ export function MaskSection({ clipId, clip }: Props) {
   const mask = clip.mask;
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <span className="text-xs uppercase tracking-wider text-ink-3">{t("mask.title")}</span>
+    <InspectorSection
+      title={t("mask.title")}
+      headerExtra={
         <label className="flex items-center gap-1 text-[11px] text-ink-3">
           <input
             type="checkbox"
@@ -37,8 +38,8 @@ export function MaskSection({ clipId, clip }: Props) {
           />
           {t("mask.enable")}
         </label>
-      </div>
-
+      }
+    >
       {mask && (
         <>
           <div className="flex gap-1">
@@ -76,7 +77,7 @@ export function MaskSection({ clipId, clip }: Props) {
           </label>
         </>
       )}
-    </div>
+    </InspectorSection>
   );
 }
 

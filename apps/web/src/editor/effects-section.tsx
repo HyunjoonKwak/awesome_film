@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import type { Clip, ID } from "@cut/core";
 import { newId } from "@cut/core";
 import { useProjectStore } from "@/stores/project-store";
+import { InspectorSection } from "@/components/inspector-section";
 import { listEffects } from "@/effects/registry";
 import { useT, type Translate } from "@/i18n/use-t";
 import type { MessageKey } from "@/i18n/messages";
@@ -162,9 +163,9 @@ export function EffectsSection({ clipId, effects }: Props) {
   };
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <span className="text-xs uppercase tracking-wider text-ink-3">{t("effects.title")}</span>
+    <InspectorSection
+      title={t("effects.title")}
+      headerExtra={
         <details className="relative">
           <summary className="btn-ghost cursor-pointer list-none px-1.5 py-0.5 text-[11px]">
             <Plus className="size-3" /> {t("effects.add")}
@@ -189,8 +190,8 @@ export function EffectsSection({ clipId, effects }: Props) {
             ))}
           </div>
         </details>
-      </div>
-
+      }
+    >
       {effects.length === 0 && <p className="text-xs text-ink-3">{t("effects.none")}</p>}
 
       <ul className="space-y-2">
@@ -311,6 +312,6 @@ export function EffectsSection({ clipId, effects }: Props) {
           );
         })}
       </ul>
-    </div>
+    </InspectorSection>
   );
 }

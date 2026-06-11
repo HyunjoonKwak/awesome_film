@@ -2,6 +2,7 @@
 
 import type { Clip, ID, Transition, TransitionType } from "@cut/core";
 import { useProjectStore } from "@/stores/project-store";
+import { InspectorSection } from "@/components/inspector-section";
 import { useT } from "@/i18n/use-t";
 
 interface Props {
@@ -30,8 +31,7 @@ export function TransitionSection({ clipId, clip }: Props) {
   const t = useT();
 
   return (
-    <div className="space-y-3">
-      <div className="text-xs uppercase tracking-wider text-ink-3">{t("trans.title")}</div>
+    <InspectorSection title={t("trans.title")}>
       <TransitionRow
         label={t("trans.in")}
         value={clip.transitionIn}
@@ -42,7 +42,7 @@ export function TransitionSection({ clipId, clip }: Props) {
         value={clip.transitionOut}
         onChange={(v) => setOut(clipId, v)}
       />
-    </div>
+    </InspectorSection>
   );
 }
 

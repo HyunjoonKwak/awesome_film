@@ -4,6 +4,8 @@ import { Diamond } from "lucide-react";
 import type { Clip, ID, BlendMode } from "@cut/core";
 import { clipTransform } from "@cut/core";
 import { useProjectStore, selectPlayhead } from "@/stores/project-store";
+import { InspectorSection } from "@/components/inspector-section";
+import { NumberScrubber } from "@/components/number-scrubber";
 import { useT } from "@/i18n/use-t";
 
 interface Props {
@@ -48,8 +50,7 @@ export function TransformSection({ clipId, clip }: Props) {
   };
 
   return (
-    <div className="space-y-2">
-      <div className="text-xs uppercase tracking-wider text-ink-3">{t("transform.title")}</div>
+    <InspectorSection title={t("transform.title")}>
       <NumRow
         label={t("transform.x")}
         min={-1}
@@ -145,7 +146,7 @@ export function TransformSection({ clipId, clip }: Props) {
       >
         {t("transform.reset")}
       </button>
-    </div>
+    </InspectorSection>
   );
 }
 
@@ -192,7 +193,14 @@ function NumRow({
           </button>
           {label}
         </span>
-        <span className="font-mono text-ink-1">{format ? format(value) : value.toFixed(2)}</span>
+        <NumberScrubber
+          value={value}
+          onChange={onChange}
+          min={min}
+          max={max}
+          step={step}
+          format={format}
+        />
       </div>
       <input
         type="range"

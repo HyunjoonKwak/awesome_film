@@ -3,6 +3,7 @@
 import { Diamond, Volume2 } from "lucide-react";
 import type { MediaClip } from "@cut/core";
 import { useProjectStore, selectPlayhead } from "@/stores/project-store";
+import { InspectorSection } from "@/components/inspector-section";
 import { useT } from "@/i18n/use-t";
 
 interface Props {
@@ -31,12 +32,10 @@ export function AudioSection({ clip }: Props) {
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <span className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-ink-3">
-          <Volume2 className="size-3" />
-          {t("audio.title")}
-        </span>
+    <InspectorSection
+      title={t("audio.title")}
+      icon={<Volume2 className="size-3" />}
+      headerExtra={
         <button
           type="button"
           onClick={toggleKey}
@@ -45,7 +44,8 @@ export function AudioSection({ clip }: Props) {
         >
           <Diamond className="size-3" fill={keyHere ? "currentColor" : "none"} />
         </button>
-      </div>
+      }
+    >
       <div className="flex items-center justify-between text-[11px] text-ink-3">
         <span>{t("audio.volume")}</span>
         <span className="font-mono text-ink-1">{Math.round(vol * 100)}%</span>
@@ -59,6 +59,6 @@ export function AudioSection({ clip }: Props) {
         onChange={(e) => setVolume(clip.id, Number(e.target.value))}
         className="w-full accent-indigo-500"
       />
-    </div>
+    </InspectorSection>
   );
 }

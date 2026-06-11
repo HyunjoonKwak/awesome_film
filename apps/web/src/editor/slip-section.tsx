@@ -3,6 +3,7 @@
 import { MoveHorizontal } from "lucide-react";
 import type { MediaClip, SpatialFit } from "@cut/core";
 import { useProjectStore } from "@/stores/project-store";
+import { InspectorSection } from "@/components/inspector-section";
 import { useT } from "@/i18n/use-t";
 
 interface Props {
@@ -24,11 +25,7 @@ export function SlipSection({ clip }: Props) {
   const max = Math.max(0, (asset?.durationMs ?? span) - span);
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-ink-3">
-        <MoveHorizontal className="size-3" />
-        {t("slip.title")}
-      </div>
+    <InspectorSection title={t("slip.title")} icon={<MoveHorizontal className="size-3" />}>
       <div className="flex items-center justify-between gap-2">
         <span className="text-[11px] text-ink-3">{t("fit.title")}</span>
         <select
@@ -58,6 +55,6 @@ export function SlipSection({ clip }: Props) {
         className="w-full accent-indigo-500 disabled:opacity-40"
       />
       {max <= 0 && <p className="text-[10px] text-ink-3">{t("slip.noSlack")}</p>}
-    </div>
+    </InspectorSection>
   );
 }

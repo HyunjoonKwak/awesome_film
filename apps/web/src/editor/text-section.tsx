@@ -3,6 +3,7 @@
 import type { TextClip, TextAnimation, TextAlign } from "@cut/core";
 import { AlignLeft, AlignCenter, AlignRight } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
+import { InspectorSection } from "@/components/inspector-section";
 import { useT } from "@/i18n/use-t";
 import { FONT_OPTIONS, FONT_WEIGHTS } from "./fonts";
 
@@ -39,8 +40,7 @@ export function TextSection({ clip }: Props) {
   const t = useT();
 
   return (
-    <div className="space-y-3">
-      <div className="text-xs uppercase tracking-wider text-ink-3">{t("text.title")}</div>
+    <InspectorSection title={t("text.title")}>
       <textarea
         value={clip.text}
         onChange={(e) => update(clip.id, { text: e.target.value })}
@@ -216,7 +216,7 @@ export function TextSection({ clip }: Props) {
         />
         <span className="text-[10px] text-ink-3">ms</span>
       </Row>
-    </div>
+    </InspectorSection>
   );
 }
 

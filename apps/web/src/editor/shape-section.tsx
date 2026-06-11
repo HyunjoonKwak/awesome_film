@@ -2,6 +2,7 @@
 
 import type { ShapeClip, ID, ShapeKind } from "@cut/core";
 import { useProjectStore } from "@/stores/project-store";
+import { InspectorSection } from "@/components/inspector-section";
 import { useT } from "@/i18n/use-t";
 
 interface Props {
@@ -16,8 +17,7 @@ export function ShapeSection({ clip }: Props) {
   const id = clip.id as ID;
 
   return (
-    <div className="space-y-3">
-      <div className="text-xs uppercase tracking-wider text-ink-3">{t("shape.title")}</div>
+    <InspectorSection title={t("shape.title")}>
       <div className="flex gap-1">
         {SHAPES.map((s) => (
           <button
@@ -127,7 +127,7 @@ export function ShapeSection({ clip }: Props) {
           />
         </div>
       )}
-    </div>
+    </InspectorSection>
   );
 }
 

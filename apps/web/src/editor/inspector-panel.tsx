@@ -16,11 +16,16 @@ import { SlipSection } from "./slip-section";
 import { AudioSection } from "./audio-section";
 import { KeyframeGraph } from "./keyframe-graph";
 import { AiPanel } from "@/ai/ai-panel";
+import { InspectorSection } from "@/components/inspector-section";
+import { NumberScrubber } from "@/components/number-scrubber";
 import { useT } from "@/i18n/use-t";
 
 export function InspectorPanel() {
   const timeline = useProjectStore((s) => s.project.timeline);
   const media = useProjectStore((s) => s.project.mediaLibrary);
+  const setClipStartMs = useProjectStore((s) => s.setClipStartMs);
+  const trimEnd = useProjectStore((s) => s.trimEnd);
+  const setClipSpeed = useProjectStore((s) => s.setClipSpeed);
   const selected = useSelectionStore((s) => s.clipIds);
   const t = useT();
 
@@ -48,60 +53,66 @@ export function InspectorPanel() {
         {!clip && <p className="text-ink-3">{t("inspector.empty")}</p>}
 
         {clip && (
-          <div className="space-y-4">
-            <dl className="space-y-3">
-              <Row label={t("inspector.kind")} value={clip.kind} />
-              <Row label={t("inspector.start")} value={`${clip.start} ms`} />
-              <Row label={t("inspector.duration")} value={`${clip.duration} ms`} />
-              <Row label={t("inspector.speed")} value={`${clip.speed}x`} />
-              {asset && (
-                <>
-                  <hr className="border-white/5" />
-                  <Row label={t("inspector.asset")} value={asset.name} />
-                  <Row label={t("inspector.assetDuration")} value={`${asset.durationMs} ms`} />
-                  {asset.width && asset.height && (
-                    <Row label={t("inspector.resolution")} value={`${asset.width}×${asset.height}`} />
-                  )}
-                </>
-              )}
-            </dl>
-            {isTextClip(clip) && (
-              <>
-                <hr className="border-white/5" />
-                <TextSection clip={clip} />
-              </>
-            )}
-            {isShapeClip(clip) && (
-              <>
-                <hr className="border-white/5" />
-                <ShapeSection clip={clip} />
-              </>
-            )}
-            <hr className="border-white/5" />
+          <div className="space-y-3">
+            <InspectorSection title={t("inspector.info")}>
+              <dl className="space-y-2">
+                <Row label={t("inspector.kind")} value={clip.kind} />
+                <EditableRow label={t("inspector.start")}>
+                  <NumberScrubber
+                    value={clip.start}
+                    onChange={(v) => setClipStartMs(clip.id, v)}
+                    min={0}
+                    step={10}
+                    commitOnRelease
+                    format={(v) => `${Math.round(v)} ms`}
+                  />
+                </EditableRow>
+                <EditableRow label={t("inspector.duration")}>
+                  <NumberScrubber
+                    value={clip.duration}
+                    onChange={(v) => trimEnd(clip.id, clip.start + v)}
+                    min={1}
+                    step={10}
+                    commitOnRelease
+                    format={(v) => `${Math.round(v)} ms`}
+                  />
+                </EditableRow>
+                <EditableRow label={t("inspector.speed")}>
+                  <NumberScrubber
+                    value={clip.speed}
+                    onChange={(v) => setClipSpeed(clip.id, v)}
+                    min={0.1}
+                    max={8}
+                    step={0.01}
+                    commitOnRelease
+                    format={(v) => `${v.toFixed(2)}x`}
+                  />
+                </EditableRow>
+                {asset && (
+                  <>
+                    <Row label={t("inspector.asset")} value={asset.name} />
+                    <Row label={t("inspector.assetDuration")} value={`${asset.durationMs} ms`} />
+                    {asset.width && asset.height && (
+                      <Row label={t("inspector.resolution")} value={`${asset.width}×${asset.height}`} />
+                    )}
+                  </>
+                )}
+              </dl>
+            </InspectorSection>
+            {isTextClip(clip) && <TextSection clip={clip} />}
+            {isShapeClip(clip) && <ShapeSection clip={clip} />}
             <TransformSection clipId={clip.id} clip={clip} />
-            <hr className="border-white/5" />
             <MaskSection clipId={clip.id} clip={clip} />
             {isMediaClip(clip) && (
               <>
-                <hr className="border-white/5" />
                 <SpeedSection clipId={clip.id} clip={clip} />
-                <hr className="border-white/5" />
                 <SlipSection clip={clip} />
-                <hr className="border-white/5" />
                 <AudioSection clip={clip} />
               </>
             )}
-            <hr className="border-white/5" />
             <TransitionSection clipId={clip.id} clip={clip} />
-            <hr className="border-white/5" />
             <EffectsSection clipId={clip.id} effects={clip.effects} />
-            {clip.keyframes.length > 0 && (
-              <>
-                <hr className="border-white/5" />
-                <KeyframeGraph clipId={clip.id} clip={clip} />
-              </>
-            )}
-            <hr className="border-white/5" />
+            {clip.keyframes.length > 0 && <KeyframeGraph clipId={clip.id} clip={clip} />}
             <AiPanel />
           </div>
         )}
@@ -115,6 +126,15 @@ function Row({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between gap-3">
       <dt className="text-xs uppercase tracking-wide text-ink-3">{label}</dt>
       <dd className="font-mono text-xs text-ink-1">{value}</dd>
+    </div>
+  );
+}
+
+function EditableRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <dt className="text-xs uppercase tracking-wide text-ink-3">{label}</dt>
+      <dd>{children}</dd>
     </div>
   );
 }

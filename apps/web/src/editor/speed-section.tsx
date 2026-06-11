@@ -4,6 +4,7 @@ import { Diamond, Gauge, Snowflake } from "lucide-react";
 import type { Clip, ID } from "@cut/core";
 import { hasSpeedRamp, isMediaClip } from "@cut/core";
 import { useProjectStore, selectPlayhead } from "@/stores/project-store";
+import { InspectorSection } from "@/components/inspector-section";
 import { useT } from "@/i18n/use-t";
 
 interface Props {
@@ -45,12 +46,10 @@ export function SpeedSection({ clipId, clip }: Props) {
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <span className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-ink-3">
-          <Gauge className="size-3" />
-          {t("speed.title")}
-        </span>
+    <InspectorSection
+      title={t("speed.title")}
+      icon={<Gauge className="size-3" />}
+      headerExtra={
         <button
           type="button"
           onClick={toggleKey}
@@ -59,8 +58,8 @@ export function SpeedSection({ clipId, clip }: Props) {
         >
           <Diamond className="size-3" fill={keyHere ? "currentColor" : "none"} />
         </button>
-      </div>
-
+      }
+    >
       <div className="flex items-center justify-between text-[11px] text-ink-3">
         <span>{t("speed.constant")}</span>
         <span className="font-mono text-ink-1">{clip.speed.toFixed(2)}x</span>
@@ -143,6 +142,6 @@ export function SpeedSection({ clipId, clip }: Props) {
           {frozen ? t("speed.unfreeze") : t("speed.freeze")}
         </button>
       )}
-    </div>
+    </InspectorSection>
   );
 }

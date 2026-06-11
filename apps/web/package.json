@@ -28,6 +28,7 @@
     "next": "^15.0.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-resizable-panels": "^2.1.9",
     "sonner": "^1.7.0",
     "tailwind-merge": "^2.5.4",
     "y-indexeddb": "^9.0.12",
