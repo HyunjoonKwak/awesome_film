@@ -163,12 +163,12 @@ function GridLines({ width, zoom }: { width: number; zoom: number }) {
   const step = 1000;
   const count = Math.ceil(width / (step * zoom));
   return (
-    <svg className="absolute inset-0 size-full" preserveAspectRatio="none">
+    <svg className="absolute inset-0 size-full" preserveAspectRatio="none" aria-hidden="true">
       {Array.from({ length: count }).map((_, i) => {
         const x = i * step * zoom;
         return (
           <line
-            key={i}
+            key={x}
             x1={x}
             x2={x}
             y1={0}

@@ -5,7 +5,7 @@ const easings: Record<Exclude<EasingFn, "bezier">, (t: number) => number> = {
   linear: (t) => t,
   "ease-in": (t) => t * t,
   "ease-out": (t) => 1 - (1 - t) * (1 - t),
-  "ease-in-out": (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2),
+  "ease-in-out": (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2),
   step: (t) => (t < 1 ? 0 : 1),
 };
 

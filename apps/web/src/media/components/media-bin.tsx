@@ -63,6 +63,7 @@ export function MediaBin() {
     null,
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-query storage only when the library size changes, not on every metadata edit.
   useEffect(() => {
     void getStorageUsage().then(setUsage);
   }, [media.length]);

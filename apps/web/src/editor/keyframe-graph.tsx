@@ -142,6 +142,7 @@ export function KeyframeGraph({ clipId, clip }: Props) {
         viewBox={`0 0 ${GRAPH_W} ${GRAPH_H}`}
         className="w-full rounded border border-white/5 bg-panel-2"
         style={{ height: GRAPH_H }}
+        aria-hidden="true"
       >
         {/* grid */}
         <line x1={0} y1={GRAPH_H / 2} x2={GRAPH_W} y2={GRAPH_H / 2} stroke="rgba(255,255,255,0.06)" />

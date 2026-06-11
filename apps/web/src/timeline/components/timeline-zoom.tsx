@@ -1,12 +1,12 @@
 "use client";
 
-import { ZoomIn, ZoomOut } from "lucide-react";
+import { Maximize2, ZoomIn, ZoomOut } from "lucide-react";
 import { useProjectStore, selectZoom } from "@/stores/project-store";
 import { useT } from "@/i18n/use-t";
+import { clampZoom } from "../constants";
+import { zoomToFit } from "../zoom-to-fit";
 
 const STEP = 1.4;
-const MIN = 0.005;
-const MAX = 1;
 
 export function TimelineZoom() {
   const zoom = useProjectStore(selectZoom);
@@ -18,7 +18,7 @@ export function TimelineZoom() {
       <button
         type="button"
         className="btn-ghost px-1.5 py-1"
-        onClick={() => setZoom(Math.max(MIN, zoom / STEP))}
+        onClick={() => setZoom(clampZoom(zoom / STEP))}
         aria-label={t("timeline.zoomOut")}
         title={t("timeline.zoomOut")}
       >
@@ -28,11 +28,20 @@ export function TimelineZoom() {
       <button
         type="button"
         className="btn-ghost px-1.5 py-1"
-        onClick={() => setZoom(Math.min(MAX, zoom * STEP))}
+        onClick={() => setZoom(clampZoom(zoom * STEP))}
         aria-label={t("timeline.zoomIn")}
         title={t("timeline.zoomIn")}
       >
         <ZoomIn className="size-3.5" />
+      </button>
+      <button
+        type="button"
+        className="btn-ghost px-1.5 py-1"
+        onClick={zoomToFit}
+        aria-label={t("timeline.zoomFit")}
+        title={`${t("timeline.zoomFit")} (⇧Z)`}
+      >
+        <Maximize2 className="size-3.5" />
       </button>
     </div>
   );

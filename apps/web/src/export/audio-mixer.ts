@@ -4,7 +4,7 @@ import { readMediaFile } from "@/persistence/opfs";
 import { combineInline } from "./audio-mixer-worker";
 import { denoise } from "./spectral-denoise";
 
-const dbToGain = (db: number): number => Math.pow(10, db / 20);
+const dbToGain = (db: number): number => 10 ** (db / 20);
 
 // Render a mono buffer through a low-shelf / mid-peaking / high-shelf biquad
 // chain using an OfflineAudioContext. Crossover points follow common DAW
@@ -198,7 +198,7 @@ export const mixProjectAudio = async (
         const decoded = await ctx.decodeAudioData(await blob.arrayBuffer());
         buffers.set(asset.id, decoded);
       } catch {
-        continue;
+        // Skip assets that fail to decode.
       }
     }
   }
@@ -232,7 +232,7 @@ export const mixProjectAudio = async (
     }
     const bus = trackKindOfClip.get(clip.id) === "audio" ? musicBus : voiceBus;
     for (let i = 0; i < processed.length && startSample + i < bus.length; i++) {
-      bus[startSample + i]! += processed[i]!;
+      bus[startSample + i]! += processed[i] ?? 0;
     }
   }
 

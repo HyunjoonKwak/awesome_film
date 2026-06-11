@@ -59,6 +59,7 @@ export function PreviewViewport() {
   }, []);
 
   // Redraw on every playhead change while paused, and on rAF while playing.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: playhead/project are intentional redraw triggers; state is read fresh from stores inside the loop.
   useEffect(() => {
     const compositor = compositorRef.current;
     if (!compositor) return;

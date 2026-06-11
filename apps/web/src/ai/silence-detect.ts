@@ -30,7 +30,7 @@ export const detectSilenceFromBlob = async (
   const ch = audioBuf.getChannelData(0);
   const sampleRate = audioBuf.sampleRate;
   const windowSamples = Math.max(1, Math.floor((sampleRate * 20) / 1000)); // 20ms window
-  const threshold = Math.pow(10, thresholdDb / 20);
+  const threshold = 10 ** (thresholdDb / 20);
 
   const ranges: { start: number; end: number }[] = [];
   let silenceStartSample: number | null = null;

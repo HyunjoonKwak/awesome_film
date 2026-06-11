@@ -59,22 +59,18 @@ export const parseVtt = (text: string): readonly SubtitleCue[] => {
 };
 
 export const toSrt = (cues: readonly SubtitleCue[]): string => {
-  return cues
+  return `${cues
     .map(
       (c, i) =>
         `${i + 1}\n${fmtTime(c.start, ",")} --> ${fmtTime(c.end, ",")}\n${c.text}`,
     )
-    .join("\n\n") + "\n";
+    .join("\n\n")}\n`;
 };
 
 export const toVtt = (cues: readonly SubtitleCue[]): string => {
-  return (
-    "WEBVTT\n\n" +
-    cues
-      .map(
-        (c) => `${fmtTime(c.start, ".")} --> ${fmtTime(c.end, ".")}\n${c.text}`,
-      )
-      .join("\n\n") +
-    "\n"
-  );
+  return `WEBVTT\n\n${cues
+    .map(
+      (c) => `${fmtTime(c.start, ".")} --> ${fmtTime(c.end, ".")}\n${c.text}`,
+    )
+    .join("\n\n")}\n`;
 };

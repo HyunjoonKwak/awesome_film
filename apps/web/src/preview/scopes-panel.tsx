@@ -39,7 +39,11 @@ export function ScopesPanel() {
           }
         }
       }
-      raf = requestAnimationFrame(() => setTimeout(() => (raf = requestAnimationFrame(draw)), 100));
+      raf = requestAnimationFrame(() =>
+        setTimeout(() => {
+          raf = requestAnimationFrame(draw);
+        }, 100),
+      );
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);

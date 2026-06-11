@@ -32,7 +32,7 @@ export function MarkerPanel() {
     const lines: string[] = [];
     if (sorted.length === 0 || sorted[0]!.at > 0) lines.push(`0:00 ${t("marker.intro")}`);
     for (const m of sorted) lines.push(`${stamp(m.at)} ${m.label || t("marker.untitled")}`);
-    const blob = new Blob([lines.join("\n") + "\n"], { type: "text/plain" });
+    const blob = new Blob([`${lines.join("\n")}\n`], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

@@ -142,7 +142,7 @@ export class WebCodecsExporter implements Exporter {
           if (norm.enabled) {
             const { integratedLufs } = measureLoudness(mixed.pcm, mixed.sampleRate);
             if (Number.isFinite(integratedLufs)) {
-              const gain = Math.pow(10, (norm.targetLufs - integratedLufs) / 20);
+              const gain = 10 ** ((norm.targetLufs - integratedLufs) / 20);
               if (Math.abs(gain - 1) > 0.01) {
                 for (let i = 0; i < mixed.pcm.length; i++) {
                   mixed.pcm[i] = Math.max(-1, Math.min(1, mixed.pcm[i]! * gain));

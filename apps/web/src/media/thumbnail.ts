@@ -57,7 +57,7 @@ export const makeVideoFilmstrip = (
 
     video.onloadedmetadata = () => {
       const duration = video.duration;
-      if (!isFinite(duration) || duration <= 0 || !video.videoWidth) {
+      if (!Number.isFinite(duration) || duration <= 0 || !video.videoWidth) {
         cleanup();
         resolve(null);
         return;

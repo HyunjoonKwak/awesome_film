@@ -19,16 +19,15 @@ export const usePluginHost = () => {
     });
 
     const list = readConfiguredPlugins();
-    list.forEach((url) => {
+    for (const url of list) {
       const s = document.createElement("script");
       s.type = "module";
       s.src = url;
       s.onerror = () => {
-        // eslint-disable-next-line no-console
         console.warn("Failed to load plugin:", url);
       };
       document.head.appendChild(s);
-    });
+    }
 
     return () => {
       offLog();

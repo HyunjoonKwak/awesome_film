@@ -21,8 +21,8 @@ const combine = (req: MixerWorkerRequest): Float32Array => {
   const totalSamples = voiceBus.length;
   const accum = new Float32Array(totalSamples);
   if (ducking?.enabled) {
-    const duckGain = Math.pow(10, ducking.amountDb / 20);
-    const threshold = Math.pow(10, ducking.thresholdDb / 20);
+    const duckGain = 10 ** (ducking.amountDb / 20);
+    const threshold = 10 ** (ducking.thresholdDb / 20);
     const win = Math.floor(sampleRate * 0.05);
     let gain = 1;
     for (let i = 0; i < totalSamples; i++) {

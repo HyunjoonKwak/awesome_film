@@ -38,7 +38,7 @@ export function TimelineRuler({ width }: { width: number }) {
 
   return (
     <div className="sticky top-0 z-10 h-7 border-b border-white/10 bg-panel-1">
-      <svg className="block size-full" preserveAspectRatio="none">
+      <svg className="block size-full" preserveAspectRatio="none" aria-hidden="true">
         {ticks.map((t) => {
           const x = t.ms * zoom;
           const isMajor = t.label !== null;

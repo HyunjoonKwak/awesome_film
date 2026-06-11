@@ -23,6 +23,7 @@ const SHORTCUTS: readonly { keys: string; labelKey: MessageKey }[] = [
   { keys: `${mod} ⇧ Z`, labelKey: "sc.redo" },
   { keys: `${mod} A`, labelKey: "sc.selectAll" },
   { keys: `${mod} G`, labelKey: "sc.group" },
+  { keys: "⇧ Z", labelKey: "sc.zoomFit" },
   { keys: "I / O", labelKey: "sc.inout" },
   { keys: "Esc", labelKey: "sc.clear" },
   { keys: "?", labelKey: "sc.help" },

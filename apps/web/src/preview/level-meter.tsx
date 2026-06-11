@@ -20,6 +20,7 @@ export function LevelMeter() {
     return (id: ID) => map.get(id);
   }, [media]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: playhead/playing are intentional ticks — the project is read fresh from the store inside.
   useEffect(() => {
     const target = playheadLevel(useProjectStore.getState().project, getAsset);
     // Fast attack, slow release for a meter-like feel.

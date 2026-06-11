@@ -39,15 +39,21 @@ export function ProjectInspectorPanel() {
           </div>
         ) : (
           <ul className="space-y-1">
-            {issues.map((issue, i) => {
+            {issues.map((issue) => {
               const Icon = ICONS[issue.severity];
               return (
                 <li
-                  key={i}
+                  key={`${issue.severity}:${issue.clipId ?? "global"}:${issue.message}`}
                   className={`flex items-start gap-2 rounded px-2 py-1.5 text-2xs ${
                     issue.clipId ? "cursor-pointer hover:bg-white/5" : ""
                   }`}
                   onClick={() => issue.clipId && select(issue.clipId as ID)}
+                  onKeyDown={(e) => {
+                    if (issue.clipId && (e.key === "Enter" || e.key === " ")) {
+                      e.preventDefault();
+                      select(issue.clipId as ID);
+                    }
+                  }}
                 >
                   <Icon className={`mt-0.5 size-3.5 shrink-0 ${COLORS[issue.severity]}`} />
                   <span className="text-ink-1">{issue.message}</span>

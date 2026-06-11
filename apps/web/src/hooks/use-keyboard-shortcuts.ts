@@ -6,6 +6,7 @@ import { usePlaybackStore } from "@/stores/playback-store";
 import { useSelectionStore } from "@/stores/selection-store";
 import { useViewStore } from "@/stores/view-store";
 import { useRangeStore } from "@/stores/range-store";
+import { zoomToFit } from "@/timeline/zoom-to-fit";
 
 const isEditable = (target: EventTarget | null): boolean => {
   if (!(target instanceof HTMLElement)) return false;
@@ -62,6 +63,13 @@ export const useKeyboardShortcuts = () => {
         const pb = usePlaybackStore.getState();
         pb.setPlaying(false);
         pb.setRate(1);
+        return;
+      }
+
+      // Shift+Z — fit the whole timeline into the viewport.
+      if (e.key.toLowerCase() === "z" && e.shiftKey && !cmd) {
+        e.preventDefault();
+        zoomToFit();
         return;
       }
 

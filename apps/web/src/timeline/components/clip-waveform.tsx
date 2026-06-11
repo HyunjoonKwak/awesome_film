@@ -48,6 +48,7 @@ export function ClipWaveform({ clip, width, height }: Props) {
       width={width}
       height={height}
       preserveAspectRatio="none"
+      aria-hidden="true"
     >
       <path d={points} fill="rgba(255,255,255,0.28)" />
     </svg>

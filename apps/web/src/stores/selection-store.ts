@@ -8,6 +8,7 @@ interface SelectionState {
   trackId: ID | null;
 
   select: (id: ID, additive?: boolean) => void;
+  selectMany: (ids: readonly ID[]) => void;
   selectTrack: (id: ID | null) => void;
   clear: () => void;
   isSelected: (id: ID) => boolean;
@@ -24,6 +25,8 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
       else next.add(id);
       return { clipIds: next };
     }),
+
+  selectMany: (ids) => set({ clipIds: new Set(ids) }),
 
   selectTrack: (id) => set({ trackId: id }),
 

@@ -13,6 +13,7 @@ export function GuidesOverlay() {
       className="pointer-events-none absolute inset-0 h-full w-full"
       viewBox="0 0 100 100"
       preserveAspectRatio="none"
+      aria-hidden="true"
     >
       {/* rule-of-thirds */}
       <g stroke="rgba(255,255,255,0.35)" strokeWidth="0.2">
