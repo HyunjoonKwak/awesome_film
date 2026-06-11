@@ -2,6 +2,7 @@ export * from "./query";
 export * from "./mutate";
 export * from "./split";
 export * from "./snap";
+export * from "./collide";
 export * from "./keyframes";
 export * from "./transitions";
 export * from "./multicam";

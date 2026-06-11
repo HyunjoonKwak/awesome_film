@@ -5,6 +5,7 @@ import type { Clip } from "@cut/core";
 import { isMediaClip, isAdjustmentClip } from "@cut/core";
 import { useProjectStore, selectZoom } from "@/stores/project-store";
 import { useSelectionStore } from "@/stores/selection-store";
+import { useTimelineUiStore } from "@/stores/timeline-ui-store";
 import { cn } from "@/lib/cn";
 import { ClipContextMenu } from "./clip-context-menu";
 import { ClipWaveform } from "./clip-waveform";
@@ -64,6 +65,15 @@ export function TimelineClip({ clip, trackHeight, trackLocked }: Props) {
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
     if (!drag.mode) return;
+    // Auto-scroll the timeline when dragging near its edges so a clip can
+    // travel beyond the visible viewport in a single gesture.
+    const scroller = (e.currentTarget as HTMLElement).closest<HTMLElement>("[data-tl-scroll]");
+    if (scroller) {
+      const rect = scroller.getBoundingClientRect();
+      const margin = 48;
+      if (e.clientX > rect.right - margin) scroller.scrollLeft += 16;
+      else if (e.clientX < rect.left + margin) scroller.scrollLeft -= 16;
+    }
     const deltaPx = e.clientX - drag.startX;
     const deltaMs = deltaPx / zoom;
     if (drag.mode === "move") {
@@ -84,6 +94,8 @@ export function TimelineClip({ clip, trackHeight, trackLocked }: Props) {
 
   const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     e.currentTarget.releasePointerCapture?.(e.pointerId);
+    // Drop the snap guide once the gesture ends.
+    useTimelineUiStore.getState().setSnapMs(null);
     // If the user dragged the body vertically onto a different track, move it.
     if (dragRef.current.mode === "move") {
       const overEl = document.elementFromPoint(e.clientX, e.clientY);

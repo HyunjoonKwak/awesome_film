@@ -13,10 +13,12 @@ import { TimelineZoom } from "./timeline-zoom";
 import { MarkerStrip } from "./marker-strip";
 import { PeerCursors } from "./peer-cursors";
 import { RangeBand } from "./range-band";
+import { SnapGuide } from "./snap-guide";
+import { SkimLine } from "./skim-line";
+import { TRACK_HEADER_W } from "../constants";
 
 const PX_PER_MS_MIN = 0.005;
 const PX_PER_MS_MAX = 1;
-const TRACK_HEADER_W = 96;
 
 export function TimelinePanel() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -181,6 +183,7 @@ export function TimelinePanel() {
 
       <div
         ref={containerRef}
+        data-tl-scroll
         className="relative flex-1 overflow-auto"
         onWheel={onWheel}
       >
@@ -200,6 +203,8 @@ export function TimelinePanel() {
             ))}
           </div>
           <Playhead containerWidth={minWidth} />
+          <SnapGuide />
+          <SkimLine />
           <PeerCursors />
         </div>
       </div>

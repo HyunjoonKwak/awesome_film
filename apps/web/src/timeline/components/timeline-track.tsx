@@ -1,10 +1,14 @@
 "use client";
 
+import { useCallback, useState } from "react";
 import { Headphones, Lock, Trash2, Unlock, Volume2, VolumeX } from "lucide-react";
 import type { Track } from "@cut/core";
+import { collectSnapPoints, newId, resolvePlacement, snapMsToFrame, snapToNearest } from "@cut/core";
 import { useProjectStore, selectZoom } from "@/stores/project-store";
+import { useTimelineUiStore } from "@/stores/timeline-ui-store";
 import { useT } from "@/i18n/use-t";
 import { TimelineClip } from "./timeline-clip";
+import { TRACK_HEADER_W } from "../constants";
 import { cn } from "@/lib/cn";
 
 interface Props {
@@ -18,16 +22,68 @@ export function TimelineTrack({ track, width }: Props) {
   const toggleSolo = useProjectStore((s) => s.toggleTrackSolo);
   const toggleLock = useProjectStore((s) => s.toggleTrackLock);
   const removeTrack = useProjectStore((s) => s.removeTrackById);
+  const dragAssetId = useTimelineUiStore((s) => s.dragAssetId);
   const t = useT();
+
+  // Media-bin drag & drop. The dragged asset id comes from the transient
+  // UI store (dataTransfer is unreadable during dragover).
+  const [previewMs, setPreviewMs] = useState<number | null>(null);
+  const dragAsset = useProjectStore((s) =>
+    dragAssetId ? s.project.mediaLibrary.find((a) => a.id === dragAssetId) ?? null : null,
+  );
+  const accepts =
+    !!dragAsset && !track.locked && track.kind === (dragAsset.kind === "audio" ? "audio" : "video");
+
+  const dropMsFromEvent = useCallback(
+    (e: React.DragEvent<HTMLDivElement>, durationMs: number): number => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const raw = Math.max(0, (e.clientX - rect.left) / zoom);
+      const p = useProjectStore.getState().project;
+      // Magnetise to clip edges / markers / playhead, frame-snap, then
+      // clamp into a free gap (clips never overlap).
+      const snapped = snapToNearest(raw, collectSnapPoints(p.timeline), 8 / Math.max(zoom, 0.001));
+      const framed = snapMsToFrame(snapped, p.framerate);
+      const current = p.timeline.tracks.find((t) => t.id === track.id);
+      return current ? resolvePlacement(current.clips, durationMs, framed) : framed;
+    },
+    [zoom, track.id],
+  );
+
+  const onDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!accepts) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    if (dragAsset) setPreviewMs(dropMsFromEvent(e, dragAsset.durationMs));
+  };
+
+  const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!accepts || !dragAsset) return;
+    e.preventDefault();
+    const start = dropMsFromEvent(e, dragAsset.durationMs);
+    useProjectStore.getState().addClipToTrack(track.id, {
+      kind: "media",
+      id: newId(),
+      assetId: dragAsset.id,
+      start,
+      duration: dragAsset.durationMs,
+      trimIn: 0,
+      trimOut: dragAsset.durationMs,
+      speed: 1,
+      effects: [],
+      keyframes: [],
+    });
+    setPreviewMs(null);
+    useTimelineUiStore.getState().setDragAssetId(null);
+  };
 
   return (
     <div className="flex items-stretch gap-0" data-track={track.id} data-track-kind={track.kind}>
       <div
         className={cn(
-          "group sticky left-0 z-10 flex w-24 shrink-0 items-center justify-between gap-1",
+          "group sticky left-0 z-10 flex shrink-0 items-center justify-between gap-1",
           "border-y border-r border-white/5 bg-panel-2 px-2 text-xs",
         )}
-        style={{ height: track.height }}
+        style={{ height: track.height, width: TRACK_HEADER_W }}
       >
         <span className="font-medium text-ink-1">{track.name}</span>
         <span className="flex items-center gap-0.5">
@@ -69,10 +125,16 @@ export function TimelineTrack({ track, width }: Props) {
         </span>
       </div>
       <div
-        className="relative border-y border-white/5 bg-panel-2/40"
-        style={{ width: width - 96, height: track.height }}
+        className={cn(
+          "relative border-y border-white/5 bg-panel-2/40",
+          accepts && "bg-accent/5",
+        )}
+        style={{ width: width - TRACK_HEADER_W, height: track.height }}
+        onDragOver={onDragOver}
+        onDragLeave={() => setPreviewMs(null)}
+        onDrop={onDrop}
       >
-        <GridLines width={width - 96} zoom={zoom} />
+        <GridLines width={width - TRACK_HEADER_W} zoom={zoom} />
         {track.clips.map((clip) => (
           <TimelineClip
             key={clip.id}
@@ -81,6 +143,17 @@ export function TimelineTrack({ track, width }: Props) {
             trackLocked={track.locked}
           />
         ))}
+        {accepts && previewMs !== null && dragAsset && (
+          <div
+            className="pointer-events-none absolute top-1 rounded-md border border-accent/60 bg-accent/20"
+            style={{
+              left: previewMs * zoom,
+              width: Math.max(2, dragAsset.durationMs * zoom),
+              height: track.height - 8,
+            }}
+            aria-hidden
+          />
+        )}
       </div>
     </div>
   );

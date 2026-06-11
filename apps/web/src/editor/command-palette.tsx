@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Keyboard, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { usePlaybackStore } from "@/stores/playback-store";
 import { useSelectionStore } from "@/stores/selection-store";
@@ -15,11 +15,11 @@ interface Action {
   run: () => void;
 }
 
-// Cmd/Ctrl+K command palette + ? shortcut cheatsheet. Actions operate on the
-// current selection / playhead via the stores at call time.
+// Cmd/Ctrl+K command palette. Actions operate on the current selection /
+// playhead via the stores at call time. (The `?` shortcut cheatsheet lives
+// in shortcut-cheatsheet.tsx, toggled via the view store.)
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
-  const [help, setHelp] = useState(false);
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const t = useT();
@@ -30,12 +30,6 @@ export function CommandPalette() {
       if (cmd && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setOpen((v) => !v);
-      }
-      if (e.key === "?" && !cmd) {
-        const el = e.target as HTMLElement;
-        if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable) return;
-        e.preventDefault();
-        setHelp((v) => !v);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -73,6 +67,12 @@ export function CommandPalette() {
         },
       },
       {
+        id: "bladeAll",
+        label: t("cmd.blade"),
+        hint: "Cmd+B",
+        run: () => ps().splitAllAt(ps().project.timeline.playhead),
+      },
+      {
         id: "marker",
         label: t("cmd.addMarker"),
         hint: "M",
@@ -89,19 +89,6 @@ export function CommandPalette() {
     const q = query.trim().toLowerCase();
     return q ? actions.filter((a) => a.label.toLowerCase().includes(q)) : actions;
   }, [actions, query]);
-
-  const SHORTCUTS: Array<[string, string]> = [
-    ["Space", t("cmd.playPause")],
-    ["S", t("cmd.split")],
-    ["M", t("cmd.addMarker")],
-    ["[ / ]", t("cmd.prevNextMarker")],
-    ["Cmd+Z", t("cmd.undo")],
-    ["Shift+Cmd+Z", t("cmd.redo")],
-    ["Cmd+A", t("cmd.selectAll")],
-    ["Del", t("cmd.deleteClip")],
-    ["Cmd+K", t("cmd.palette")],
-    ["?", t("cmd.help")],
-  ];
 
   return (
     <>
@@ -150,26 +137,6 @@ export function CommandPalette() {
               {filtered.length === 0 && (
                 <li className="px-3 py-6 text-center text-xs text-ink-3">{t("cmd.noResults")}</li>
               )}
-            </ul>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
-
-      <Dialog.Root open={help} onOpenChange={setHelp}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-white/10 bg-panel-1 p-5 shadow-2xl">
-            <Dialog.Title className="flex items-center gap-2 text-base font-medium text-ink-1">
-              <Keyboard className="size-4" />
-              {t("cmd.shortcuts")}
-            </Dialog.Title>
-            <ul className="mt-4 space-y-1.5">
-              {SHORTCUTS.map(([key, label]) => (
-                <li key={key} className="flex items-center justify-between text-sm">
-                  <span className="text-ink-2">{label}</span>
-                  <kbd className="rounded bg-white/5 px-2 py-0.5 text-[11px] text-ink-1">{key}</kbd>
-                </li>
-              ))}
             </ul>
           </Dialog.Content>
         </Dialog.Portal>

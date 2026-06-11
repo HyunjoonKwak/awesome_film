@@ -42,7 +42,9 @@ import {
   type CommandHistory,
   findClip,
   newId,
+  resolvePlacement,
   snapClipStart,
+  snapMsToFrame,
   updateClip,
   setClipTransform,
   setClipMask,
@@ -63,6 +65,7 @@ import {
   type BezierHandles,
   type KeyframeTrack,
 } from "@cut/core";
+import { useTimelineUiStore } from "./timeline-ui-store";
 import { createMarkerActions } from "./actions/marker-actions";
 import { createKeyframeActions } from "./actions/keyframe-actions";
 import { createTrackActions } from "./actions/track-actions";
@@ -111,7 +114,9 @@ interface ProjectStoreState {
   moveClipToOtherTrack: (clipId: ID, destTrackId: ID) => void;
   trimEnd: (clipId: ID, newEnd: Ms) => void;
   trimStart: (clipId: ID, newStart: Ms) => void;
+  setClipStartMs: (clipId: ID, startMs: Ms) => void;
   splitAt: (clipId: ID, at: Ms) => void;
+  splitAllAt: (at: Ms) => void;
   setTransform: (clipId: ID, patch: Partial<ClipTransform>) => void;
   setMask: (clipId: ID, mask: ClipMask | undefined) => void;
   setBlendMode: (clipId: ID, mode: BlendMode | undefined) => void;
@@ -385,18 +390,34 @@ export const useProjectStore = create<ProjectStoreState>()(
         ),
       ),
 
-    moveClipBy: (clipId, deltaMs) =>
+    moveClipBy: (clipId, deltaMs) => {
+      // Pre-compute the snap so the transient snap-guide store can light up
+      // the matched edge while the drag is in flight.
+      const pre = get().project;
+      const preClip = findClip(pre.timeline, clipId);
+      if (!preClip) return;
+      const candidate = Math.max(0, preClip.start + deltaMs);
+      // Snap tolerance: 8px in current zoom (frames are ~33ms @ 30fps)
+      const toleranceMs = 8 / Math.max(pre.timeline.zoom, 0.001);
+      const snappedPre = snapClipStart(pre.timeline, preClip, candidate, { toleranceMs });
+      useTimelineUiStore.getState().setSnapMs(snappedPre !== candidate ? snappedPre : null);
       runWith(set, "Move clip", (p) => {
         const clip = findClip(p.timeline, clipId);
         if (!clip) return p;
-        const candidate = Math.max(0, clip.start + deltaMs);
-        // Snap tolerance: 8px in current zoom (frames are ~33ms @ 30fps)
-        const toleranceMs = 8 / Math.max(p.timeline.zoom, 0.001);
-        const snapped = snapClipStart(p.timeline, clip, candidate, { toleranceMs });
+        const target = Math.max(0, clip.start + deltaMs);
+        const tol = 8 / Math.max(p.timeline.zoom, 0.001);
+        const snapped = snapClipStart(p.timeline, clip, target, { toleranceMs: tol });
         // Grouped clips move rigidly together by the snapped delta.
         if (clip.groupId) return moveClipOrGroup(p, clipId, snapped - clip.start);
-        return updateClip(p, clipId, (c) => ({ ...c, start: snapped }));
-      }),
+        // Magnetic rule: clips on a track never overlap — clamp into the
+        // nearest free gap.
+        const track = p.timeline.tracks.find((t) => t.clips.some((c) => c.id === clipId));
+        const resolved = track
+          ? resolvePlacement(track.clips, clip.duration, snapped, clipId)
+          : snapped;
+        return updateClip(p, clipId, (c) => ({ ...c, start: resolved }));
+      });
+    },
 
     groupSelected: (clipIds) =>
       runWith(set, "Group clips", (p) => groupClips(p, clipIds)),
@@ -421,6 +442,16 @@ export const useProjectStore = create<ProjectStoreState>()(
 
     trimStart: (clipId, newStart) =>
       runWith(set, "Trim clip", (p) => trimClipStart(p, clipId, newStart)),
+
+    // Exact (typed) clip start — frame-snapped but free of edge snapping,
+    // unlike moveClipBy which magnetises to neighbours while dragging.
+    setClipStartMs: (clipId, startMs) =>
+      runWith(set, "Set clip start", (p) =>
+        updateClip(p, clipId, (c) => ({
+          ...c,
+          start: Math.max(0, snapMsToFrame(startMs, p.framerate)),
+        })),
+      ),
 
     rollEditBy: (clipId, deltaMs) =>
       runWith(set, "Roll edit", (p) => rollEdit(p, clipId, deltaMs)),
@@ -461,6 +492,22 @@ export const useProjectStore = create<ProjectStoreState>()(
 
     splitAt: (clipId, at) =>
       runWith(set, "Split clip", (p) => splitClipAt(p, clipId, at)),
+
+    // FCP-style blade-all (Cmd+B): split every clip under `at` on every
+    // track in a single undoable command. No-op (and no history entry)
+    // when the playhead isn't over any clip.
+    splitAllAt: (at) => {
+      const hit = get().project.timeline.tracks.some((t) =>
+        t.clips.some((c) => at > c.start && at < c.start + c.duration),
+      );
+      if (!hit) return;
+      runWith(set, "Blade all tracks", (p) => {
+        const ids = p.timeline.tracks.flatMap((t) =>
+          t.clips.filter((c) => at > c.start && at < c.start + c.duration).map((c) => c.id),
+        );
+        return ids.reduce((proj, id) => splitClipAt(proj, id, at), p);
+      });
+    },
 
     setTransform: (clipId, patch) =>
       // Skip history entry for smooth slider drags.

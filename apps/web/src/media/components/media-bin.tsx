@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FolderUp, Music, Image as ImageIcon, Film, Layers, Loader2, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useProjectStore } from "@/stores/project-store";
+import { useTimelineUiStore } from "@/stores/timeline-ui-store";
 import { useMediaImport } from "@/media/hooks";
 import { cn } from "@/lib/cn";
 import { useT } from "@/i18n/use-t";
@@ -204,6 +205,15 @@ export function MediaBin() {
                 <button
                   type="button"
                   onClick={() => addToTimeline(asset)}
+                  draggable
+                  onDragStart={(e) => {
+                    // Tracks read the dragged asset from the UI store —
+                    // dataTransfer is set too for completeness.
+                    e.dataTransfer.setData("application/x-cut-asset", asset.id);
+                    e.dataTransfer.effectAllowed = "copy";
+                    useTimelineUiStore.getState().setDragAssetId(asset.id);
+                  }}
+                  onDragEnd={() => useTimelineUiStore.getState().setDragAssetId(null)}
                   className="w-full overflow-hidden rounded-md border border-white/5
                              bg-panel-2 text-left transition hover:border-accent"
                   title={t("media.clickToAdd")}

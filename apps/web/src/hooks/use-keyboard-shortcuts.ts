@@ -65,6 +65,29 @@ export const useKeyboardShortcuts = () => {
         return;
       }
 
+      // `m` — drop a marker at the playhead.
+      if (e.key === "m" && !cmd) {
+        const store = useProjectStore.getState();
+        store.addMarkerAt(store.project.timeline.playhead);
+        return;
+      }
+
+      // Cmd/Ctrl+B — blade: split every clip under the playhead, all tracks.
+      if (cmd && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        const store = useProjectStore.getState();
+        store.splitAllAt(store.project.timeline.playhead);
+        return;
+      }
+
+      // Home / End — jump the playhead to the start / end of the timeline.
+      if (e.key === "Home" || e.key === "End") {
+        e.preventDefault();
+        const store = useProjectStore.getState();
+        store.setPlayheadMs(e.key === "Home" ? 0 : store.project.timeline.duration);
+        return;
+      }
+
       // `,` / `.` — jump to the previous / next marker.
       if ((e.key === "," || e.key === ".") && !cmd) {
         const proj = useProjectStore.getState().project;
@@ -134,15 +157,17 @@ export const useKeyboardShortcuts = () => {
         useSelectionStore.setState({ clipIds: new Set(all) });
       }
 
-      // Arrow left/right — clip edits. Plain = nudge (Shift = 1s). Alt = roll
-      // the cut with the next clip. Alt+Shift = slide between neighbours.
+      // Arrow left/right. With a selection: clip edits — plain = nudge
+      // (Shift = 1s), Alt = roll the cut with the next clip, Alt+Shift =
+      // slide between neighbours. Without a selection: FCP-style playhead
+      // frame stepping (Shift = 1s).
       if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault();
         const ids = useSelectionStore.getState().clipIds;
+        const store = useProjectStore.getState();
+        const fps = store.project.framerate;
+        const dir = e.key === "ArrowLeft" ? -1 : 1;
         if (ids.size > 0) {
-          e.preventDefault();
-          const fps = useProjectStore.getState().project.framerate;
-          const dir = e.key === "ArrowLeft" ? -1 : 1;
-          const store = useProjectStore.getState();
           if (e.altKey && e.shiftKey) {
             const delta = dir * (1000 / fps) * 5;
             for (const id of ids) store.slideClipBy(id, delta);
@@ -153,8 +178,11 @@ export const useKeyboardShortcuts = () => {
             const delta = dir * (e.shiftKey ? 1000 : 1000 / fps);
             for (const id of ids) store.moveClipBy(id, delta);
           }
-          return;
+        } else {
+          const delta = dir * (e.shiftKey ? 1000 : 1000 / fps);
+          store.setPlayheadMs(store.project.timeline.playhead + delta);
         }
+        return;
       }
 
       // `?` — toggle the keyboard shortcut cheatsheet

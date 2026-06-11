@@ -1,11 +1,12 @@
 "use client";
 
 import { useProjectStore, selectPlayhead, selectZoom } from "@/stores/project-store";
+import { TRACK_HEADER_W } from "../constants";
 
 export function Playhead({ containerWidth }: { containerWidth: number }) {
   const playhead = useProjectStore(selectPlayhead);
   const zoom = useProjectStore(selectZoom);
-  const x = 96 + playhead * zoom; // 96px = track header width
+  const x = TRACK_HEADER_W + playhead * zoom;
 
   if (x > containerWidth) return null;
 
