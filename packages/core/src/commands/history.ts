@@ -43,6 +43,20 @@ export const runCommand = (
   };
 };
 
+// Record an edit that was already applied transiently (e.g. a drag gesture
+// committed once on pointer-up) as a single undo step.
+export const recordApplied = (
+  before: Project,
+  after: Project,
+  history: CommandHistory,
+  label: string,
+): CommandHistory => {
+  const applied: AppliedCommand = { label, before, after, at: Date.now() };
+  const nextPast = [...history.past, applied];
+  const trimmed = nextPast.length > MAX_HISTORY ? nextPast.slice(-MAX_HISTORY) : nextPast;
+  return { past: trimmed, future: [] };
+};
+
 export interface StepResult {
   readonly project: Project;
   readonly history: CommandHistory;

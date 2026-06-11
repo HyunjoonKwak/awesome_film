@@ -41,7 +41,9 @@ import {
   redo as redoHistory,
   type CommandHistory,
   findClip,
+  magneticMove,
   newId,
+  recordApplied,
   resolvePlacement,
   snapClipStart,
   snapMsToFrame,
@@ -109,6 +111,10 @@ interface ProjectStoreState {
   toggleClipDisabledById: (clipId: ID) => void;
   toggleFreezeAtPlayhead: (clipId: ID) => void;
   moveClipBy: (clipId: ID, deltaMs: Ms) => void;
+  // Drag session — transient magnetic moves committed as ONE undo step.
+  beginClipDrag: () => void;
+  dragClipTo: (clipId: ID, targetStartMs: Ms) => void;
+  endClipDrag: () => void;
   groupSelected: (clipIds: readonly ID[]) => void;
   ungroupClip: (clipId: ID) => void;
   moveClipToOtherTrack: (clipId: ID, destTrackId: ID) => void;
@@ -161,6 +167,10 @@ const runWith = (
     return { project, history };
   });
 };
+
+// Project snapshot captured at clip-drag start. Module-scoped on purpose:
+// it is transient gesture state, never rendered and never persisted.
+let clipDragBefore: Project | null = null;
 
 export const useProjectStore = create<ProjectStoreState>()(
   subscribeWithSelector((set, get) => ({
@@ -389,6 +399,52 @@ export const useProjectStore = create<ProjectStoreState>()(
             : c,
         ),
       ),
+
+    // Drag session: all pointer-move updates are computed from the project
+    // captured at drag start (idempotent magnetics, no per-pixel history)
+    // and committed as a single undo entry on pointer-up.
+    beginClipDrag: () => {
+      clipDragBefore = get().project;
+    },
+
+    dragClipTo: (clipId, targetStartMs) => {
+      const before = clipDragBefore;
+      if (!before) return;
+      const clip = findClip(before.timeline, clipId);
+      if (!clip) return;
+      const target = Math.max(0, targetStartMs);
+      const tol = 8 / Math.max(before.timeline.zoom, 0.001);
+      const snapped = snapClipStart(before.timeline, clip, target, { toleranceMs: tol });
+      useTimelineUiStore.getState().setSnapMs(snapped !== target ? snapped : null);
+      const framed = snapMsToFrame(snapped, before.framerate);
+      if (clip.groupId) {
+        // Rigid group move from the snapshot; groups don't push neighbours.
+        set({ project: moveClipOrGroup(before, clipId, framed - clip.start) });
+        return;
+      }
+      const tracks = before.timeline.tracks.map((t) =>
+        t.clips.some((c) => c.id === clipId)
+          ? { ...t, clips: magneticMove(t.clips, clipId, framed) }
+          : t,
+      );
+      set({
+        project: {
+          ...before,
+          updatedAt: Date.now(),
+          timeline: { ...before.timeline, tracks },
+        },
+      });
+    },
+
+    endClipDrag: () => {
+      const before = clipDragBefore;
+      clipDragBefore = null;
+      useTimelineUiStore.getState().setSnapMs(null);
+      if (!before) return;
+      const after = get().project;
+      if (after === before) return;
+      set((s) => ({ history: recordApplied(before, after, s.history, "Move clip") }));
+    },
 
     moveClipBy: (clipId, deltaMs) => {
       // Pre-compute the snap so the transient snap-guide store can light up

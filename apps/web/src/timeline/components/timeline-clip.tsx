@@ -27,7 +27,6 @@ interface DragState {
 
 export function TimelineClip({ clip, trackHeight, trackLocked }: Props) {
   const zoom = useProjectStore(selectZoom);
-  const move = useProjectStore((s) => s.moveClipBy);
   const trimEnd = useProjectStore((s) => s.trimEnd);
   const trimStart = useProjectStore((s) => s.trimStart);
   const moveToTrack = useProjectStore((s) => s.moveClipToOtherTrack);
@@ -60,6 +59,9 @@ export function TimelineClip({ clip, trackHeight, trackLocked }: Props) {
         originalStart: clip.start,
         originalDuration: clip.duration,
       };
+      // Move drags run as a session: transient magnetic updates, one undo
+      // entry committed on pointer-up.
+      if (mode === "move") useProjectStore.getState().beginClipDrag();
     };
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -77,10 +79,10 @@ export function TimelineClip({ clip, trackHeight, trackLocked }: Props) {
     const deltaPx = e.clientX - drag.startX;
     const deltaMs = deltaPx / zoom;
     if (drag.mode === "move") {
-      // Absolute target from the drag origin; moveClipBy snaps to nearby edges /
-      // markers / playhead and moves the whole group when grouped.
-      const target = Math.max(0, drag.originalStart + deltaMs);
-      move(clip.id, target - clip.start);
+      // Absolute target from the drag origin; dragClipTo snaps to nearby
+      // edges / markers / playhead, pushes downstream clips magnetically and
+      // moves the whole group when grouped — all from the drag-start layout.
+      useProjectStore.getState().dragClipTo(clip.id, drag.originalStart + deltaMs);
     } else if (drag.mode === "trim-end") {
       trimEnd(clip.id, Math.max(drag.originalStart + drag.originalDuration + deltaMs, drag.originalStart + 50));
     } else {
@@ -96,6 +98,8 @@ export function TimelineClip({ clip, trackHeight, trackLocked }: Props) {
     e.currentTarget.releasePointerCapture?.(e.pointerId);
     // Drop the snap guide once the gesture ends.
     useTimelineUiStore.getState().setSnapMs(null);
+    // Commit the whole move gesture as a single undo entry.
+    if (dragRef.current.mode === "move") useProjectStore.getState().endClipDrag();
     // If the user dragged the body vertically onto a different track, move it.
     if (dragRef.current.mode === "move") {
       const overEl = document.elementFromPoint(e.clientX, e.clientY);
