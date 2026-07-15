@@ -25,7 +25,10 @@ export class WebCodecsExporter implements Exporter {
     onProgress: (p: ExportProgress) => void,
   ): Promise<ExportResult> {
     if (!isWebCodecsSupported()) {
-      throw new Error("WebCodecs unavailable in this browser; use the FFmpeg fallback");
+      throw new Error(
+        "Video export needs the WebCodecs API, which this browser doesn't support. " +
+          "Try the latest Chrome or Edge, or Safari 17+.",
+      );
     }
 
     const { project, getAsset } = await this.resolveProject(req.projectId);
