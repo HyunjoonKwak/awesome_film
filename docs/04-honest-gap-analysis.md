@@ -1,8 +1,9 @@
 # Honest gap analysis — where we are vs FCP / CapCut / DaVinci Resolve
 
-Written 2026-05. Phases 1–16 shipped the architecture and the obvious AI
-differentiators; this audit catalogues what's still **missing or shallow**
-across the six axes the user called out.
+First written 2026-05 (Phases 1–16). **Re-audited 2026-07** against the actual
+code after Phases 17–25 landed: almost everything the May draft marked missing
+has since shipped. The tables below reflect the **current** tree, not the
+original plan. See git history for the pre-July version.
 
 Legend: ✅ shipped • 🟡 partial / needs work • ❌ missing
 
@@ -12,11 +13,12 @@ Legend: ✅ shipped • 🟡 partial / needs work • ❌ missing
 | -- | :--: | -- |
 | H.264 MP4 export (WebCodecs) | ✅ | 4 presets (YT 1080p/4K, TikTok 9:16, Web VP9) |
 | Audio mixing into export | ✅ | OfflineAudioContext + AudioEncoder AAC |
-| Clip transform applied (pos/scale/rot) | ❌ | All clips drawn fullscreen — major gap |
-| Transitions rendered | ❌ | Data model exists, never executed |
+| Clip transform applied (pos/scale/rot) | ✅ | Vertex-shader affine transform, keyframe overrides (`compositor.ts`) |
+| Transitions rendered | ✅ | fade/dissolve/dip/slide/zoom/spin + GPU wipe mask |
 | Effect keyframe interpolation in export | ✅ | Compositor samples per-frame |
-| Export progress + cancel button | 🟡 | Progress yes, cancel button missing |
-| Export ETA | ❌ | Just percentage |
+| Export progress + cancel button | ✅ | Progress, fps, ETA, working cancel |
+| Loudness normalization | ✅ | LUFS measure + normalize |
+| Stereo export | ❌ | Audio mixer hardcodes mono / 48 kHz (`exporter.ts:64`, `audio-mixer.ts`) |
 | Lossless / proxy export | ❌ | One quality per preset |
 | GIF / image-sequence export | ❌ | |
 
@@ -25,54 +27,55 @@ Legend: ✅ shipped • 🟡 partial / needs work • ❌ missing
 | Capability | Status | Notes |
 | -- | :--: | -- |
 | Whisper auto-generation | ✅ | Tiny.en model, source-time mapping |
-| Edit subtitle text inline | 🟡 | Only via inspector when a single clip is selected |
-| Dedicated subtitle panel (list view, batch edit) | ❌ | |
-| Adjust subtitle timing | 🟡 | Drag/trim works, no precision input |
-| SRT / VTT import | ❌ | |
-| SRT / VTT export | ❌ | |
+| Dedicated subtitle panel (list view, batch edit) | ✅ | `subtitles/subtitle-panel.tsx` |
+| Edit subtitle text inline | ✅ | Panel list + inspector |
+| Adjust subtitle timing | 🟡 | Drag/trim works; no numeric precision input |
+| SRT / VTT import | ✅ | `srt.ts` parse round-trip |
+| SRT / VTT export | ✅ | Burn-in style presets in panel |
 | Per-language tracks | ❌ | |
-| Subtitle style presets (top/bottom/karaoke) | ❌ | |
+| Karaoke / word-level styling | ❌ | |
 
 ## 3. Effects library
 
 | Capability | Status | Notes |
 | -- | :--: | -- |
 | GPU-accelerated effect chain | ✅ | WebGL2 ping-pong FBO |
-| Built-in effects | 🟡 | 4 only: brightness, blur, vignette, bg-remove |
-| Color correction (contrast/saturation/hue/levels/LUT) | ❌ | Critical for any serious editor |
-| Sharpen / unsharp mask | ❌ | |
-| Chroma key (green screen) | ❌ | Hard requirement for VFX |
-| Stylize (sepia/invert/film grain) | ❌ | |
-| Audio effects (EQ/compressor/fade) | ❌ | No audio effect chain yet |
-| Effect reordering | ❌ | First-added is first-applied; no drag |
+| Built-in effects | ✅ | **24 definitions** — see `effects/definitions/` |
+| Color correction (contrast/saturation/hue/levels/LUT) | ✅ | + white-balance, vibrance, split-tone, color-wheels |
+| Sharpen / unsharp mask | ✅ | `sharpen.ts` |
+| Chroma key (green screen) | ✅ | YUV-distance keyer + spill suppression |
+| Stylize (sepia/invert/film grain) | ✅ | `sepia`, `invert`, `grain` |
+| Audio effects (EQ/gate/fade/denoise) | ✅ | 5 audio effects incl. FFT spectral denoise |
+| Effect reordering | ✅ | Drag-and-drop in `effects-section.tsx` |
+| 1D LUT support | ❌ | `parse-cube.ts:29` throws "not supported yet" (3D LUTs work) |
 | Effect preview thumbnails | ❌ | |
-| Per-category browser | 🟡 | `category` field exists on def, no UI |
 
 ## 4. GPU performance
 
 | Capability | Status | Notes |
 | -- | :--: | -- |
-| WebGL2 compositor | ✅ | Custom, ~250 lines |
+| WebGL2 compositor | ✅ | ~550 lines, ping-pong FBO, 22 shaders |
+| WebCodecs VideoDecoder for playback | ✅ | `mp4-decoder.ts` + mp4box demux |
+| LRU VideoFrame cache | ✅ | `video-frame-cache.ts` (tested) |
 | WebGPU | ❌ | Future; WebGL2 is fine for now |
-| WebCodecs VideoDecoder for playback | ❌ | Big one — currently `<video>.currentTime` seek, slow & imprecise |
-| LRU VideoFrame cache | ❌ | |
-| Texture pool / explicit GPU memory cap | ❌ | Leaks possible on long sessions |
+| Texture pool / explicit GPU memory cap | ❌ | Leaks possible on very long sessions |
 | Off-main-thread render (worker) | ❌ | Compositor runs on main; OK for now |
-| MediaPipe mask cached per frame | 🟡 | Recomputed every render — heavy |
+| MediaPipe mask cached per frame | 🟡 | **Still recomputed every render** (`compositor.ts:479`) — heavy |
+| Scene-detect / motion-track use WebCodecs decoder | ❌ | Still serial `<video>.currentTime` seeking — slow |
 
-## 5. Component management
+## 5. Component / editing UX
 
 | Capability | Status | Notes |
 | -- | :--: | -- |
 | Domain folder layout | ✅ | timeline/preview/media/effects/ai/etc |
-| Per-clip transform UI | ❌ | Position/scale/rotate not editable |
-| Effect reorder / collapse | ❌ | |
-| Drag-to-add (media → timeline) | 🟡 | Click adds, drag-drop works for files but not for re-positioning |
-| Multi-select (rubber band) | ❌ | Only shift-click |
-| Context menus (right-click) | ❌ | |
-| Keyboard nav between clips (J/K/L) | ❌ | Pro editor staple |
-| Markers / chapter notes | ❌ | |
-| Bookmarks | ❌ | |
+| Per-clip transform UI | ✅ | `transform-section.tsx` — x/y/scale/rot/opacity + keyframes |
+| Effect reorder / category browser | ✅ | Drag reorder + grouped add menu |
+| Multi-select (marquee) | ✅ | Cmd/Ctrl+drag in `timeline-panel.tsx` (+ shift-click) |
+| Context menus (right-click) | ✅ | Radix `clip-context-menu.tsx` |
+| Keyboard nav / shuttle (J/K/L) | ✅ | `use-keyboard-shortcuts.ts` + blade/markers/nudge/group |
+| Markers / chapter notes | ✅ | `marker-panel.tsx` + strip + YouTube-chapter export |
+| Command palette (Cmd+K) | ✅ | + shortcut cheatsheet |
+| **React error boundaries** | ✅ | **Added 2026-07** — route `error.tsx` + preview panel isolation |
 
 ## 6. Local file management
 
@@ -80,27 +83,32 @@ Legend: ✅ shipped • 🟡 partial / needs work • ❌ missing
 | -- | :--: | -- |
 | OPFS-backed media blobs | ✅ | Survives reload, browser restart |
 | Yjs project persistence | ✅ | IndexedDB |
-| Media bin search / filter / sort | ❌ | Linear scroll only |
-| Delete media | ❌ | No remove button |
-| OPFS storage usage indicator | ❌ | |
+| Multi-project library | ✅ | `project-library.ts` + `project-menu.tsx` |
+| JSON project export / import | ✅ | `project-export.ts` (now round-trip tested) |
+| Media bin search / filter / delete | ✅ | + OPFS storage meter |
+| Version snapshots | 🟡 | `snapshots.ts` exists; no named-snapshot UI |
 | Media metadata (codec, bitrate, fps) | 🟡 | Only width/height/duration captured |
-| Multi-project library | ❌ | Hardcoded single project |
-| JSON project export / import | ❌ | |
-| Auto-backup / version history | 🟡 | Yjs gives undo, no named snapshots |
-| Trash / recycle bin | ❌ | |
+| Trash / recycle bin | ❌ | Delete is immediate |
 
-## Priority order for phases 18–25
+## What actually remains — the real backlog (2026-07)
 
-The biggest practical gaps for a serious editor (in order):
+The feature gaps are now mostly **polish**. The load-bearing gaps are in
+**engineering health**, not features:
 
-1. **Phase 18 — Effect library expansion** (5 axes blocker)
-2. **Phase 19 — Clip transform** (1, 4, 5 axes blocker)
-3. **Phase 20 — Subtitle editor + SRT/VTT** (2 axes blocker)
-4. **Phase 21 — Media management** (6 axes blocker)
-5. **Phase 22 — Multi-project** (6 axes blocker)
-6. **Phase 23 — Transitions render** (1, 3 axes blocker)
-7. **Phase 24 — WebCodecs VideoDecoder** (4 axes uplift)
-8. **Phase 25 — Export hardening** (1 axis polish)
+1. **Test coverage ≈ 5.7%.** `core/timeline` and audio DSP are well tested;
+   `stores`, `persistence`, `commands/history`, `ai`, and the entire React UI
+   are (mostly) untested. Highest-risk untested area: persistence save/load.
+   *(2026-07: added round-trip tests for `project-export` and `text-anim`.)*
+2. **`packages/core` half-empty.** `ai/collab/export/media/playback/renderer`
+   dirs are 0-byte. The real implementations live in `apps/web`, so nothing is
+   broken — but the "framework-agnostic engine" goal stalled at model+timeline,
+   and the empty dirs are dead scaffolding to either fill or delete.
+3. **CI quality gate.** *(2026-07: added `ci.yml` — lint/typecheck/test on
+   every push + PR. Previously only a manual release workflow existed.)*
+4. **Perf**: MediaPipe mask recompute per frame; AI sampling doesn't reuse the
+   WebCodecs decoder; no GPU texture cap.
+5. **Feature polish**: stereo export, per-language subtitle tracks, 1D LUTs,
+   effect preview thumbnails, named version snapshots, GIF export.
 
-Each phase is shippable independently and all flow through the same
-immutable command pipeline so undo/redo and collaboration stay free.
+Everything flows through the same immutable command pipeline, so undo/redo and
+collaboration stay free as these land.
