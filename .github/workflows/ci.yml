@@ -45,3 +45,8 @@ jobs:
 
       - name: Test
         run: pnpm -r test
+
+      # Production build catches Next/RSC issues that tsc alone misses. The
+      # static Electron export + .dmg packaging still live in release.yml.
+      - name: Build (web production)
+        run: pnpm --filter @cut/web build
