@@ -19,6 +19,7 @@ import { cn } from "@/lib/cn";
 import { usePluginHost } from "@/plugins/use-plugin-host";
 import { CommandPalette } from "./command-palette";
 import { ShortcutCheatsheet } from "./shortcut-cheatsheet";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 export function EditorShell() {
   useKeyboardShortcuts();
@@ -61,7 +62,9 @@ export function EditorShell() {
             <Panel minSize={30}>
               <main className="flex h-full flex-col overflow-hidden bg-black">
                 <div className="min-h-0 flex-1">
-                  <PreviewViewport />
+                  <ErrorBoundary label="Preview">
+                    <PreviewViewport />
+                  </ErrorBoundary>
                 </div>
                 {/* Transport controls live with the viewer, FCP-style. */}
                 <div className="h-10 shrink-0 border-t border-white/5 bg-panel-1">
@@ -113,7 +116,9 @@ function MobileShell() {
         <TopBar />
       </header>
       <main className="flex-1 overflow-hidden bg-black">
-        <PreviewViewport />
+        <ErrorBoundary label="Preview">
+          <PreviewViewport />
+        </ErrorBoundary>
       </main>
       <section className="h-10 border-t border-white/5 bg-panel-1">
         <TransportBar />
