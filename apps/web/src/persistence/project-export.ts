@@ -11,6 +11,42 @@ export interface ProjectExport {
   readonly project: Project;
 }
 
+// Structural validation of the load-bearing fields. `.passthrough()` keeps
+// optional/extra fields (transforms, keyframes, effect params, proxy paths)
+// without enumerating the whole model, while still rejecting a file whose
+// tracks/clips/assets are missing their core shape — the gap that previously
+// let superficially-valid-but-corrupt files into the store and IndexedDB.
+const clipSchema = z
+  .object({
+    id: z.string(),
+    kind: z.string(),
+    start: z.number(),
+    duration: z.number(),
+    speed: z.number(),
+    effects: z.array(z.unknown()),
+    keyframes: z.array(z.unknown()),
+  })
+  .passthrough();
+
+const trackSchema = z
+  .object({
+    id: z.string(),
+    kind: z.string(),
+    clips: z.array(clipSchema),
+  })
+  .passthrough();
+
+const mediaAssetSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    kind: z.string(),
+    mime: z.string(),
+    durationMs: z.number(),
+    opfsPath: z.string(),
+  })
+  .passthrough();
+
 const exportSchema = z.object({
   schema: z.literal("cut_editor-project"),
   version: z.number().int(),
@@ -23,13 +59,13 @@ const exportSchema = z.object({
     framerate: z.number(),
     resolution: z.object({ w: z.number(), h: z.number() }),
     timeline: z.object({
-      tracks: z.array(z.any()),
+      tracks: z.array(trackSchema),
       playhead: z.number(),
       zoom: z.number(),
       magnetic: z.boolean(),
       duration: z.number(),
     }),
-    mediaLibrary: z.array(z.any()),
+    mediaLibrary: z.array(mediaAssetSchema),
   }) as unknown as z.ZodType<Project>,
 });
 
@@ -40,7 +76,18 @@ export const toProjectExport = (project: Project): ProjectExport => ({
   project,
 });
 
-export const parseProjectExport = (raw: unknown): ProjectExport => exportSchema.parse(raw);
+export const parseProjectExport = (raw: unknown): ProjectExport => {
+  const env = exportSchema.parse(raw);
+  // Refuse a file written by a newer app version rather than silently importing
+  // a format we don't understand. Older versions would migrate here; v1 is
+  // currently the only version.
+  if (env.version > PROJECT_VERSION) {
+    throw new Error(
+      `This project needs a newer version of the app (file v${env.version}, this app v${PROJECT_VERSION}).`,
+    );
+  }
+  return env;
+};
 
 export const downloadProjectJson = (project: Project): void => {
   const json = JSON.stringify(toProjectExport(project), null, 2);

@@ -44,4 +44,36 @@ describe("project-export", () => {
     expect(() => parseProjectExport("not json")).toThrow();
     expect(() => parseProjectExport(42)).toThrow();
   });
+
+  it("rejects a project whose clips are missing core fields", () => {
+    const good = toProjectExport(createEmptyProject());
+    const corrupt = {
+      ...good,
+      project: {
+        ...good.project,
+        timeline: {
+          ...good.project.timeline,
+          tracks: [{ id: "t", kind: "video", clips: [{ nonsense: true }] }],
+        },
+      },
+    };
+    expect(() => parseProjectExport(corrupt)).toThrow();
+  });
+
+  it("rejects a media asset missing its opfsPath", () => {
+    const good = toProjectExport(createEmptyProject());
+    const corrupt = {
+      ...good,
+      project: {
+        ...good.project,
+        mediaLibrary: [{ id: "a", name: "x", kind: "video", mime: "video/mp4", durationMs: 1 }],
+      },
+    };
+    expect(() => parseProjectExport(corrupt)).toThrow();
+  });
+
+  it("rejects a file written by a newer app version", () => {
+    const env = toProjectExport(createEmptyProject());
+    expect(() => parseProjectExport({ ...env, version: env.version + 1 })).toThrow();
+  });
 });
