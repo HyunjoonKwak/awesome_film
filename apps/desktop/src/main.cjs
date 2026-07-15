@@ -34,6 +34,11 @@ protocol.registerSchemesAsPrivileged([
       supportFetchAPI: true,
       corsEnabled: true,
       stream: true,
+      // Required for navigator.serviceWorker.register() to succeed on this
+      // custom scheme — secure+standard alone aren't enough in Electron, so
+      // without this the SW silently fails to register and offline caching
+      // never works on desktop.
+      allowServiceWorkers: true,
     },
   },
 ]);
@@ -71,8 +76,12 @@ const resolveAppPath = (urlPath) => {
   let rel = cleaned.replace(/^\/+/, "");
   if (rel === "" || rel.endsWith("/")) rel += "index.html";
   let target = path.join(WEB_OUT, rel);
-  // Fall back to <route>.html when the asset isn't a directory index.
-  if (!fs.existsSync(target) && !path.extname(target)) {
+  // An existing directory (e.g. `/editor` with no trailing slash, as the SW
+  // caches it) must resolve to its index.html, or readFile throws EISDIR.
+  if (fs.existsSync(target) && fs.statSync(target).isDirectory()) {
+    target = path.join(target, "index.html");
+  } else if (!fs.existsSync(target) && !path.extname(target)) {
+    // Fall back to <route>.html, else the SPA shell.
     if (fs.existsSync(`${target}.html`)) target = `${target}.html`;
     else target = path.join(WEB_OUT, "index.html");
   }
