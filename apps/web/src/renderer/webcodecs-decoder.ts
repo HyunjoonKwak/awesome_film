@@ -9,6 +9,11 @@ import { decodeMp4ToCache, type DecoderHandle } from "./mp4-decoder";
 export const isWebCodecsAvailable = (): boolean =>
   typeof window !== "undefined" && "VideoDecoder" in window;
 
+// A cached frame is only trusted if it's within this window of the requested
+// time. Beyond it we return null so the compositor seeks a real <video>
+// instead of showing a far-off cached frame (the cache is a small global LRU).
+const FRAME_TOLERANCE_US = 100_000; // 100ms
+
 export interface FrameProvider {
   framesFor(assetId: string, atMs: number): VideoFrame | null;
   prepare(assetId: string, blob: Blob): Promise<boolean>;
@@ -22,7 +27,7 @@ class CachingFrameProvider implements FrameProvider {
   private readonly pending = new Map<string, Promise<boolean>>();
 
   framesFor(assetId: string, atMs: number): VideoFrame | null {
-    const f = this.cache.nearest(assetId, Math.round(atMs * 1000));
+    const f = this.cache.nearest(assetId, Math.round(atMs * 1000), FRAME_TOLERANCE_US);
     return f ? f.frame : null;
   }
 

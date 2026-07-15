@@ -40,7 +40,17 @@ export class VideoFrameCache {
     }
   }
 
-  nearest(assetId: string, targetUs: number): CachedFrame | null {
+  // Closest cached frame within `toleranceUs` of the target time. Beyond that
+  // we return null so the caller falls back to a real <video> seek instead of
+  // showing a frame from the wrong moment — the 24-slot cache is global, so
+  // the "nearest" frame for a just-requested time can actually be the end of
+  // a long clip whose start was already evicted. Default tolerance is
+  // unbounded to preserve plain nearest-neighbour lookups.
+  nearest(
+    assetId: string,
+    targetUs: number,
+    toleranceUs = Number.POSITIVE_INFINITY,
+  ): CachedFrame | null {
     let best: CachedFrame | null = null;
     let bestDelta = Number.POSITIVE_INFINITY;
     for (const f of this.map.values()) {
@@ -51,7 +61,7 @@ export class VideoFrameCache {
         best = f;
       }
     }
-    return best;
+    return bestDelta <= toleranceUs ? best : null;
   }
 
   forget(assetId: string): void {
