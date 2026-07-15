@@ -214,8 +214,13 @@ export const mixProjectAudio = async (
     const durSamples = Math.floor((clip.duration / 1000) * sampleRate);
 
     const slice = new Float32Array(durSamples);
+    // Read the source at clip.speed so exported audio tracks the video, which
+    // advances source time by speed (see sourceOffsetForRamp in the
+    // compositor). Constant-speed clips sync exactly; a speed-ramped clip uses
+    // its base speed here — a pitch-correct ramp needs time-stretching, which
+    // is a larger, separate change.
     for (let i = 0; i < durSamples; i++) {
-      const srcIdx = inSampleOffset + Math.floor((i * srcSampleRate) / sampleRate);
+      const srcIdx = inSampleOffset + Math.floor((i * srcSampleRate * clip.speed) / sampleRate);
       if (srcIdx < 0 || srcIdx >= src.length) continue;
       slice[i] = src[srcIdx]!;
     }
