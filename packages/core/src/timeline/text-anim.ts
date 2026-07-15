@@ -38,7 +38,10 @@ export const textAnimAt = (clip: TextClip, clipRelMs: Ms): TextAnimState => {
   }
 
   function applyAnim(kind: string, p: number, isIn: boolean) {
-    const dir = isIn ? 1 : 1; // both fade toward p=1 fully visible
+    // Intro pulls the clip toward rest as p→1; the outro must push back out
+    // the SAME edge it entered from, so slide direction flips on the way out
+    // (a slide-up outro exits upward, not downward).
+    const dir = isIn ? 1 : -1;
     switch (kind) {
       case "fade":
         opacityMul *= p;
