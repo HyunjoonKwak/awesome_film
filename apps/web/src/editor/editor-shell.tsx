@@ -22,12 +22,14 @@ import { ShortcutCheatsheet } from "./shortcut-cheatsheet";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { useProjectStore } from "@/stores/project-store";
 import { collectMediaGarbage } from "@/persistence/media-gc";
+import { useAudioPlayback } from "@/preview/use-audio-playback";
 
 export function EditorShell() {
   useKeyboardShortcuts();
   useGlobalFileDrop();
   useCollab();
   usePluginHost();
+  useAudioPlayback();
   const isMobile = useIsBelow(900);
   const isDesktopApp = useIsDesktopApp();
 
