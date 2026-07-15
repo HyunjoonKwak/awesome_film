@@ -61,6 +61,22 @@ export const deleteMediaFile = async (key: string): Promise<void> => {
   }
 };
 
+// Every key currently held in the OPFS store (or the in-memory fallback).
+// Used by media GC to find blobs no project references anymore.
+export const listMediaKeys = async (): Promise<readonly string[]> => {
+  if (!supportsOpfs()) return [...inMemory.keys()];
+  try {
+    const root = await getRoot();
+    const keys: string[] = [];
+    for await (const key of (root as unknown as { keys(): AsyncIterable<string> }).keys()) {
+      keys.push(key);
+    }
+    return keys;
+  } catch {
+    return [];
+  }
+};
+
 // Browser-quota snapshot. Returns `null` if the StorageManager API isn't
 // available (e.g. older Safari).
 export const getStorageUsage = async (): Promise<{

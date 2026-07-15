@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FolderOpen, Sliders, X } from "lucide-react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { TopBar } from "./top-bar";
@@ -20,6 +20,8 @@ import { usePluginHost } from "@/plugins/use-plugin-host";
 import { CommandPalette } from "./command-palette";
 import { ShortcutCheatsheet } from "./shortcut-cheatsheet";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { useProjectStore } from "@/stores/project-store";
+import { collectMediaGarbage } from "@/persistence/media-gc";
 
 export function EditorShell() {
   useKeyboardShortcuts();
@@ -28,6 +30,16 @@ export function EditorShell() {
   usePluginHost();
   const isMobile = useIsBelow(900);
   const isDesktopApp = useIsDesktopApp();
+
+  // Reclaim OPFS blobs no project references, shortly after load so the active
+  // project has settled. Undo-safe: deletion keeps blobs, GC only reaps ones
+  // unreachable from any saved or current project.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      void collectMediaGarbage(useProjectStore.getState().project).catch(() => {});
+    }, 3000);
+    return () => clearTimeout(id);
+  }, []);
 
   if (isMobile) return <MobileShell />;
   return (

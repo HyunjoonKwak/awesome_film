@@ -103,10 +103,12 @@ export function MediaBin() {
   }, []);
 
   const handleDelete = useCallback(
-    async (asset: MediaAsset) => {
+    (asset: MediaAsset) => {
+      // Metadata-only delete: keep the OPFS blob (and proxy) so Undo can fully
+      // restore the clip and its media. Orphaned blobs are reclaimed by
+      // startup GC once no project — current or saved — references them.
       try {
         removeMediaAsset(asset.id);
-        await deleteMediaFile(asset.opfsPath);
         toast.success(t("media.deleted", { name: asset.name }));
       } catch (err) {
         toast.error(`${t("media.deleteFailed")}: ${err instanceof Error ? err.message : err}`);
