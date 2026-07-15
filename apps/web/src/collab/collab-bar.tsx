@@ -12,7 +12,10 @@ const DEFAULT_WS = "wss://demos.yjs.dev"; // public test relay
 export function CollabBar() {
   const peers = useAwarenessStore((s) => s.peers);
   const [joined, setJoined] = useState(false);
-  const [room, setRoom] = useState("cut-editor-demo");
+  // Random per-session room instead of a shared public one, so clicking Share
+  // doesn't sync your project into a guessable room on the open relay. Share
+  // this generated code out-of-band with whoever should join.
+  const [room, setRoom] = useState(() => `cut-${crypto.randomUUID().slice(0, 8)}`);
   const t = useT();
 
   const join = () => {
