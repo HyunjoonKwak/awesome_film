@@ -50,6 +50,12 @@ export class Compositor {
   private readonly assetTextures = new Map<string, WebGLTexture>();
   private readonly textTextures = new Map<string, WebGLTexture>();
   private readonly bgMaskTextures = new Map<string, WebGLTexture>();
+  // asset.id -> source time (s) the cached mask was computed at. MediaPipe
+  // segmentation is the single most expensive per-frame op, so we skip it when
+  // the underlying source frame hasn't advanced (idle re-renders, edits while
+  // paused). Videos re-segment as currentTime moves; still images (no
+  // currentTime) segment once and stay cached.
+  private readonly bgMaskTime = new Map<string, number>();
   private readonly pingPong: PingPong;
   private readonly scratch: ScratchPool;
   // Stable slot indices for the scratch pool. Slot 0 holds the captured
@@ -479,16 +485,25 @@ export class Compositor {
   private async uploadBgMask(asset: MediaAsset): Promise<WebGLTexture | null> {
     const source = await this.sources.get(asset);
     if (!source) return null;
+
+    // Reuse the last mask when the source frame hasn't moved. `currentTime`
+    // is stable across idle re-renders of a paused clip and identical for
+    // still images (which lack it, so they key on 0).
+    const srcTime = "currentTime" in source ? source.currentTime : 0;
+    const cached = this.bgMaskTextures.get(asset.id);
+    if (cached && this.bgMaskTime.get(asset.id) === srcTime) return cached;
+
     try {
       const segmenter = await getSegmenter();
       const mask = await segmenter.segmentFor(source);
       if (!mask) return null;
-      let tex = this.bgMaskTextures.get(asset.id);
+      let tex = cached;
       if (!tex) {
         tex = createTexture(this.gl);
         this.bgMaskTextures.set(asset.id, tex);
       }
       uploadSource(this.gl, tex, mask);
+      this.bgMaskTime.set(asset.id, srcTime);
       return tex;
     } catch (err) {
       // eslint-disable-next-line no-console
@@ -507,6 +522,7 @@ export class Compositor {
     this.textTextures.clear();
     for (const tex of this.bgMaskTextures.values()) this.gl.deleteTexture(tex);
     this.bgMaskTextures.clear();
+    this.bgMaskTime.clear();
     this.scratch.dispose();
     this.shaders.dispose();
     this.pingPong.dispose();
