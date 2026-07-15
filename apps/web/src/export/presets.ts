@@ -38,11 +38,14 @@ export const PRESETS: readonly ExportPreset[] = [
     audioBitrateKbps: 192,
   },
   {
+    // VP9 video is genuinely encoded, but the muxer is always mp4-muxer and
+    // only AAC audio is supported — so this is a VP9-in-MP4 file, not WebM.
+    // Labeled and configured to match reality (and so audio isn't dropped).
     id: "web-vp9",
-    name: "Web (WebM/VP9)",
-    container: "webm",
+    name: "Web (VP9 · MP4)",
+    container: "mp4",
     videoCodec: "vp9",
-    audioCodec: "opus",
+    audioCodec: "aac",
     width: 1920,
     height: 1080,
     fps: 30,
