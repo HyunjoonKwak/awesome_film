@@ -22,7 +22,6 @@ export function PreviewViewport() {
   const playhead = useProjectStore(selectPlayhead);
   const playing = usePlaybackStore((s) => s.playing);
   const setPlayhead = useProjectStore((s) => s.setPlayheadMs);
-  const fps = project.framerate;
   const t = useT();
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -70,19 +69,39 @@ export function PreviewViewport() {
       void compositor.renderFrame(useProjectStore.getState().project, assetById);
     };
     if (playing) {
-      const tick = () => {
+      // Wall-clock playback: advance the playhead by REAL elapsed time so
+      // speed is independent of the display refresh rate (a 30fps project must
+      // not run 2x on a 60Hz screen). Renders are skipped while one is still
+      // in flight to avoid overlapping seeks, and playback stops at both ends.
+      let last = performance.now();
+      let rendering = false;
+      const safeDraw = () => {
+        if (cancelled || rendering) return;
+        rendering = true;
+        void compositor
+          .renderFrame(useProjectStore.getState().project, assetById)
+          .finally(() => {
+            rendering = false;
+          });
+      };
+      const tick = (now: number) => {
         if (cancelled) return;
-        const cur = useProjectStore.getState().project.timeline.playhead;
-        // Shuttle: advance by the playback rate (negative = reverse).
+        const dt = now - last;
+        last = now;
+        // Shuttle: advance by real elapsed time × rate (negative = reverse).
         const rate = usePlaybackStore.getState().rate;
-        const next = cur + (1000 / fps) * rate;
+        const timeline = useProjectStore.getState().project.timeline;
+        const next = timeline.playhead + dt * rate;
         if (next <= 0) {
           setPlayhead(0);
+          usePlaybackStore.getState().setPlaying(false);
+        } else if (timeline.duration > 0 && next >= timeline.duration) {
+          setPlayhead(timeline.duration);
           usePlaybackStore.getState().setPlaying(false);
         } else {
           setPlayhead(next);
         }
-        draw();
+        safeDraw();
         raf = requestAnimationFrame(tick);
       };
       raf = requestAnimationFrame(tick);
@@ -93,7 +112,7 @@ export function PreviewViewport() {
       cancelled = true;
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [playing, playhead, project, assetById, fps, setPlayhead]);
+  }, [playing, playhead, project, assetById, setPlayhead]);
 
   const { w, h } = project.resolution;
 
