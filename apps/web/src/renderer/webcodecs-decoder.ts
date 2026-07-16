@@ -3,10 +3,10 @@
 // any requested timestamp. Callers fall back to the <video> path when this
 // returns null (unsupported codec, container, or browser).
 
+import { type DecoderHandle, decodeMp4ToCache } from "./mp4-decoder";
 import { VideoFrameCache } from "./video-frame-cache";
-import { decodeMp4ToCache, type DecoderHandle } from "./mp4-decoder";
 
-export const isWebCodecsAvailable = (): boolean =>
+const isWebCodecsAvailable = (): boolean =>
   typeof window !== "undefined" && "VideoDecoder" in window;
 
 // A cached frame is only trusted if it's within this window of the requested

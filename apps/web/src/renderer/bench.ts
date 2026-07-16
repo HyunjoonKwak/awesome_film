@@ -1,8 +1,8 @@
+import { useProjectStore } from "@/stores/project-store";
 import type { ID, MediaAsset } from "@cut/core";
 import { Compositor } from "./compositor";
-import { useProjectStore } from "@/stores/project-store";
 
-export interface BenchResult {
+interface BenchResult {
   readonly frames: number;
   readonly totalMs: number;
   readonly avgMs: number;
@@ -17,7 +17,7 @@ export interface BenchResult {
 //
 // Run from the DevTools console:
 //   await window.__cutBench(120)
-export const runRenderBench = async (frames = 60): Promise<BenchResult> => {
+const runRenderBench = async (frames = 60): Promise<BenchResult> => {
   const project = useProjectStore.getState().project;
   const assets = new Map(project.mediaLibrary.map((a) => [a.id, a]));
   const getAsset = (id: ID): MediaAsset | undefined => assets.get(id);

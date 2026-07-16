@@ -1,8 +1,8 @@
 import type { ID } from "@cut/core";
 
-export type Container = "mp4" | "webm";
-export type VideoCodec = "h264" | "vp9" | "av1";
-export type AudioCodec = "aac" | "opus";
+type Container = "mp4" | "webm";
+type VideoCodec = "h264" | "vp9" | "av1";
+type AudioCodec = "aac" | "opus";
 
 export interface ExportPreset {
   readonly id: string;
@@ -24,9 +24,9 @@ export interface ExportRequest {
 
 export interface ExportProgress {
   readonly stage: "preparing" | "rendering" | "muxing" | "finalizing";
-  readonly progress: number;       // 0..1
-  readonly fps?: number;            // realised render fps
-  readonly etaSeconds?: number;     // rough estimate remaining
+  readonly progress: number; // 0..1
+  readonly fps?: number; // realised render fps
+  readonly etaSeconds?: number; // rough estimate remaining
 }
 
 export interface ExportResult {

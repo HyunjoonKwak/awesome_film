@@ -1,10 +1,36 @@
-import type { ID, MediaAsset, Project } from "@cut/core";
-import { isMediaClip, sampleKeyframeTrack, type EffectInstance } from "@cut/core";
 import { readMediaFile } from "@/persistence/opfs";
+import type { ID, MediaAsset, Project } from "@cut/core";
+import { type EffectInstance, type MediaClip, isMediaClip, sampleKeyframeTrack } from "@cut/core";
 import { combineInline } from "./audio-mixer-worker";
 import { denoise } from "./spectral-denoise";
 
 const dbToGain = (db: number): number => 10 ** (db / 20);
+
+// Resample one timeline clip into output-rate PCM while following its
+// instantaneous speed curve. Accumulating the source cursor makes this O(n);
+// repeatedly integrating from the clip start for every sample would be O(n²).
+export const resampleClipAudio = (
+  source: Float32Array,
+  sourceSampleRate: number,
+  outputSampleRate: number,
+  clip: MediaClip,
+): Float32Array => {
+  const output = new Float32Array(Math.floor((clip.duration / 1000) * outputSampleRate));
+  const speedTrack = clip.keyframes.find((track) => track.target === "speed");
+  let sourceCursor = (clip.trimIn / 1000) * sourceSampleRate;
+
+  for (let i = 0; i < output.length; i++) {
+    const sourceIndex = Math.floor(sourceCursor);
+    if (sourceIndex >= 0 && sourceIndex < source.length) output[i] = source[sourceIndex] ?? 0;
+
+    const relMs = (i / outputSampleRate) * 1000;
+    const instantaneousRate = speedTrack
+      ? Math.max(0.05, sampleKeyframeTrack(speedTrack, relMs) ?? clip.speed)
+      : clip.speed;
+    sourceCursor += (sourceSampleRate / outputSampleRate) * instantaneousRate;
+  }
+  return output;
+};
 
 // Render a mono buffer through a low-shelf / mid-peaking / high-shelf biquad
 // chain using an OfflineAudioContext. Crossover points follow common DAW
@@ -208,22 +234,8 @@ export const mixProjectAudio = async (
     const buf = buffers.get(clip.assetId);
     if (!buf) continue;
     const src = buf.getChannelData(0);
-    const srcSampleRate = buf.sampleRate;
     const startSample = Math.floor((clip.start / 1000) * sampleRate);
-    const inSampleOffset = Math.floor((clip.trimIn / 1000) * srcSampleRate);
-    const durSamples = Math.floor((clip.duration / 1000) * sampleRate);
-
-    const slice = new Float32Array(durSamples);
-    // Read the source at clip.speed so exported audio tracks the video, which
-    // advances source time by speed (see sourceOffsetForRamp in the
-    // compositor). Constant-speed clips sync exactly; a speed-ramped clip uses
-    // its base speed here — a pitch-correct ramp needs time-stretching, which
-    // is a larger, separate change.
-    for (let i = 0; i < durSamples; i++) {
-      const srcIdx = inSampleOffset + Math.floor((i * srcSampleRate * clip.speed) / sampleRate);
-      if (srcIdx < 0 || srcIdx >= src.length) continue;
-      slice[i] = src[srcIdx]!;
-    }
+    const slice = resampleClipAudio(src, buf.sampleRate, sampleRate, clip);
     const processed = await applyAudioEffects(slice, clip.effects, sampleRate);
     // Apply clip volume — a keyframed "volume" track overrides the static value.
     const volTrack = clip.keyframes.find((k) => k.target === "volume");
@@ -231,7 +243,7 @@ export const mixProjectAudio = async (
     if (volTrack || baseVol !== 1) {
       for (let i = 0; i < processed.length; i++) {
         const relMs = (i / sampleRate) * 1000;
-        const v = volTrack ? sampleKeyframeTrack(volTrack, relMs) ?? baseVol : baseVol;
+        const v = volTrack ? (sampleKeyframeTrack(volTrack, relMs) ?? baseVol) : baseVol;
         processed[i] = processed[i]! * v;
       }
     }
@@ -260,7 +272,9 @@ const getWorker = (): Worker | null => {
   if (typeof Worker === "undefined") return null;
   if (mixerWorker) return mixerWorker;
   try {
-    mixerWorker = new Worker(new URL("./audio-mixer-worker.ts", import.meta.url), { type: "module" });
+    mixerWorker = new Worker(new URL("./audio-mixer-worker.ts", import.meta.url), {
+      type: "module",
+    });
     return mixerWorker;
   } catch {
     return null;

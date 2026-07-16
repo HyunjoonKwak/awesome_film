@@ -1,36 +1,37 @@
 "use client";
 
-import { useState } from "react";
-import { LogOut, Share2 } from "lucide-react";
-import { toast } from "sonner";
-import { getBridge } from "./yjs-bridge";
-import { useAwarenessStore } from "./awareness-store";
 import { useT } from "@/i18n/use-t";
+import { LogOut, Share2 } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+import { useAwarenessStore } from "./awareness-store";
+import { useCollabSessionStore } from "./collab-session-store";
+import { getBridge } from "./yjs-bridge";
 
 const DEFAULT_WS = "wss://demos.yjs.dev"; // public test relay
 
 export function CollabBar() {
   const peers = useAwarenessStore((s) => s.peers);
-  const [joined, setJoined] = useState(false);
+  const joinedRoom = useCollabSessionStore((state) => state.room);
   // Random per-session room instead of a shared public one, so clicking Share
   // doesn't sync your project into a guessable room on the open relay. Share
   // this generated code out-of-band with whoever should join.
-  const [room, setRoom] = useState(() => `cut-${crypto.randomUUID().slice(0, 8)}`);
+  const [room, setRoom] = useState(() => `cut-${crypto.randomUUID()}`);
   const t = useT();
 
   const join = () => {
     try {
       getBridge().joinRoom(DEFAULT_WS, `cut-editor:${room}`);
-      setJoined(true);
       toast.success(t("collab.joined", { room }));
     } catch (err) {
-      toast.error(t("collab.joinFailed", { msg: err instanceof Error ? err.message : String(err) }));
+      toast.error(
+        t("collab.joinFailed", { msg: err instanceof Error ? err.message : String(err) }),
+      );
     }
   };
   const leave = () => {
     try {
       getBridge().leaveRoom();
-      setJoined(false);
       toast.info(t("collab.left"));
     } catch {
       // ignore
@@ -53,7 +54,7 @@ export function CollabBar() {
             </span>
           ))}
       </div>
-      {joined ? (
+      {joinedRoom ? (
         <button
           type="button"
           onClick={leave}

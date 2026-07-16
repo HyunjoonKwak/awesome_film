@@ -1,10 +1,17 @@
-import * as Y from "yjs";
+import { useProjectStore } from "@/stores/project-store";
+import type { Clip, Project } from "@cut/core";
 import { IndexeddbPersistence } from "y-indexeddb";
 import { WebsocketProvider } from "y-websocket";
-import type { Clip, Project } from "@cut/core";
-import { useProjectStore } from "@/stores/project-store";
+import * as Y from "yjs";
+import { type PeerCursor, useAwarenessStore } from "./awareness-store";
+import { useCollabSessionStore } from "./collab-session-store";
+import {
+  diffPendingProject,
+  mergePendingProject,
+  projectClipJson,
+  projectStructureFingerprint,
+} from "./project-merge";
 import { useSaveStateStore } from "./save-state-store";
-import { useAwarenessStore, type PeerCursor } from "./awareness-store";
 
 // Bridges Zustand `project` state into a Yjs document for persistence + sync.
 //
@@ -27,7 +34,7 @@ const LEGACY_KEY = "snapshot";
 const LOCAL_ORIGIN = { local: true };
 
 // Project shape with clip bodies replaced by id lists — what `structure` holds.
-type Structure = Omit<Project, "timeline"> & {
+type Structure = Omit<Project, "id" | "timeline"> & {
   timeline: Omit<Project["timeline"], "tracks"> & {
     tracks: (Omit<Project["timeline"]["tracks"][number], "clips"> & {
       clipIds: readonly string[];
@@ -35,37 +42,49 @@ type Structure = Omit<Project, "timeline"> & {
   };
 };
 
-const toStructure = (p: Project): Structure => ({
-  ...p,
-  timeline: {
-    ...p.timeline,
-    tracks: p.timeline.tracks.map(({ clips, ...rest }) => ({
-      ...rest,
-      clipIds: clips.map((c) => c.id),
-    })),
-  },
-});
+const toStructure = (p: Project): Structure => {
+  const { id: _localProjectId, ...project } = p;
+  return {
+    ...project,
+    timeline: {
+      ...p.timeline,
+      tracks: p.timeline.tracks.map(({ clips, ...rest }) => ({
+        ...rest,
+        clipIds: clips.map((c) => c.id),
+      })),
+    },
+  };
+};
 
-const rebuild = (structure: Structure, clipsMap: Y.Map<Clip>): Project =>
-  ({
+const rebuild = (
+  projectId: Project["id"],
+  structure: Structure,
+  clipsMap: Y.Map<Clip>,
+): Project => {
+  const project = {
     ...structure,
+    // A project id identifies a local library entry, not shared content. Each
+    // peer keeps its own id so a remote snapshot cannot trigger a local
+    // project switch and tear down the room it just joined.
+    id: projectId,
     timeline: {
       ...structure.timeline,
       tracks: structure.timeline.tracks.map(({ clipIds, ...rest }) => ({
         ...rest,
-        clips: clipIds
-          .map((id) => clipsMap.get(id))
-          .filter((c): c is Clip => c !== undefined),
+        clips: clipIds.map((id) => clipsMap.get(id)).filter((c): c is Clip => c !== undefined),
       })),
     },
-  }) as Project;
-
-const clipJsonMap = (p: Project): Map<string, string> =>
-  new Map(
-    p.timeline.tracks.flatMap((t) => t.clips.map((c) => [c.id, JSON.stringify(c)] as const)),
+  } as Project;
+  const duration = project.timeline.tracks.reduce(
+    (max, track) =>
+      track.clips.reduce((trackMax, clip) => Math.max(trackMax, clip.start + clip.duration), max),
+    0,
   );
+  return { ...project, timeline: { ...project.timeline, duration } };
+};
 
 export interface CollabBridge {
+  readonly projectId: Project["id"];
   readonly doc: Y.Doc;
   readonly persistence: IndexeddbPersistence;
   ws: WebsocketProvider | null;
@@ -76,25 +95,35 @@ export interface CollabBridge {
 
 let bridge: CollabBridge | null = null;
 
+export const projectPersistenceName = (projectId: Project["id"]): string =>
+  `cut-editor:project:${encodeURIComponent(projectId)}`;
+
 export const getBridge = (): CollabBridge => {
-  if (bridge) return bridge;
+  const projectId = useProjectStore.getState().project.id;
+  if (bridge?.projectId === projectId) return bridge;
+  bridge?.dispose();
   const doc = new Y.Doc();
-  const persistence = new IndexeddbPersistence("cut-editor:project", doc);
+  const persistence = new IndexeddbPersistence(projectPersistenceName(projectId), doc);
   const clipsMap = doc.getMap<Clip>(CLIPS);
   const structMap = doc.getMap<Structure>(STRUCT);
 
   let applyingRemote = false;
   // Caches so a flush only writes clips/structure that actually changed —
   // this is what keeps a local edit from clobbering a peer's concurrent edit.
-  let lastStructureJson = "";
+  let lastStructureFingerprint = "";
   let lastClipJson = new Map<string, string>();
 
   const SNAPSHOT_DEBOUNCE_MS = 120;
   let pending: ReturnType<typeof setTimeout> | null = null;
+  let queuedProject: Project | null =
+    useProjectStore.getState().project.id === projectId ? useProjectStore.getState().project : null;
+  let disposed = false;
 
   const flush = () => {
     pending = null;
-    const project = useProjectStore.getState().project;
+    const current = useProjectStore.getState().project;
+    const project = queuedProject?.id === projectId ? queuedProject : current;
+    if (project.id !== projectId || disposed) return;
     doc.transact(() => {
       const seen = new Set<string>();
       const nextClips = new Map<string, string>();
@@ -113,19 +142,33 @@ export const getBridge = (): CollabBridge => {
       }
       lastClipJson = nextClips;
 
-      const structureJson = JSON.stringify(toStructure(project));
-      if (structureJson !== lastStructureJson) {
-        structMap.set(STRUCT_KEY, JSON.parse(structureJson) as Structure);
-        lastStructureJson = structureJson;
+      const structureFingerprint = projectStructureFingerprint(project);
+      if (structureFingerprint !== lastStructureFingerprint) {
+        structMap.set(STRUCT_KEY, JSON.parse(JSON.stringify(toStructure(project))) as Structure);
+        lastStructureFingerprint = structureFingerprint;
       }
     }, LOCAL_ORIGIN);
   };
 
   const unsubscribe = useProjectStore.subscribe(
     (s) => s.project,
-    () => {
-      if (applyingRemote) return;
+    (project, previous) => {
+      if (applyingRemote || project.id !== projectId) return;
+      // Playhead and zoom are local view state. Ignoring those high-frequency
+      // changes prevents structure LWW churn during playback.
+      if (
+        project.timeline.tracks === previous.timeline.tracks &&
+        project.mediaLibrary === previous.mediaLibrary &&
+        project.name === previous.name &&
+        project.framerate === previous.framerate &&
+        project.resolution === previous.resolution &&
+        project.timeline.magnetic === previous.timeline.magnetic &&
+        project.timeline.markers === previous.timeline.markers
+      ) {
+        return;
+      }
       useSaveStateStore.getState().setState("saving");
+      queuedProject = project;
       if (pending) clearTimeout(pending);
       pending = setTimeout(flush, SNAPSHOT_DEBOUNCE_MS);
     },
@@ -133,28 +176,58 @@ export const getBridge = (): CollabBridge => {
 
   persistence.on("synced", () => useSaveStateStore.getState().markSaved());
 
-  const applyRemote = () => {
+  const applyRemote = (): Project | null => {
     const structure = structMap.get(STRUCT_KEY);
-    if (!structure) return;
+    const localProject = useProjectStore.getState().project;
+    if (!structure || localProject.id !== projectId || disposed) return null;
+    const localView = useProjectStore.getState().project.timeline;
     applyingRemote = true;
-    const project = rebuild(structure, clipsMap);
+    const rebuilt = rebuild(projectId, structure, clipsMap);
+    const project: Project = {
+      ...rebuilt,
+      timeline: {
+        ...rebuilt.timeline,
+        playhead: localView.playhead,
+        zoom: localView.zoom,
+      },
+    };
+    queuedProject = project;
     // Prime the caches so our next flush doesn't re-broadcast what we received.
-    lastStructureJson = JSON.stringify(toStructure(project));
-    lastClipJson = clipJsonMap(project);
+    lastStructureFingerprint = projectStructureFingerprint(project);
+    lastClipJson = projectClipJson(project);
     useProjectStore.getState().loadProject(project);
     applyingRemote = false;
+    return project;
   };
 
   const handleRemote = (tx: Y.Transaction) => {
     if (tx.origin === LOCAL_ORIGIN) return; // our own write — ignore
-    applyRemote();
+    const localBeforeRemote = useProjectStore.getState().project;
+    const delta = pending
+      ? diffPendingProject(localBeforeRemote, lastClipJson, lastStructureFingerprint)
+      : null;
+    if (pending) {
+      clearTimeout(pending);
+      pending = null;
+    }
+    const remote = applyRemote();
+    if (!remote || !delta) return;
+
+    const merged = mergePendingProject(remote, delta);
+    applyingRemote = true;
+    useProjectStore.getState().loadProject(merged);
+    applyingRemote = false;
+    // Re-emit the preserved local delta immediately. This closes the race where
+    // a remote transaction arrived inside the 120ms local debounce window.
+    flush();
   };
   const onClips = (_e: Y.YMapEvent<Clip>, tx: Y.Transaction) => handleRemote(tx);
   const onStruct = (_e: Y.YMapEvent<Structure>, tx: Y.Transaction) => handleRemote(tx);
   clipsMap.observe(onClips);
   structMap.observe(onStruct);
 
-  persistence.whenSynced.then(() => {
+  void persistence.whenSynced.then(() => {
+    if (disposed) return;
     // One-time migration from the pre-clip-level whole-project snapshot so
     // existing local projects keep opening after this change ships.
     const legacy = doc.getMap<Project>(LEGACY_MAP).get(LEGACY_KEY);
@@ -169,7 +242,14 @@ export const getBridge = (): CollabBridge => {
         doc.getMap(LEGACY_MAP).delete(LEGACY_KEY);
       }, LOCAL_ORIGIN);
     }
-    applyRemote();
+    if (structMap.get(STRUCT_KEY)) {
+      applyRemote();
+    } else {
+      // A freshly created per-project document starts with the already
+      // hydrated library snapshot instead of waiting for the first edit.
+      queuedProject = useProjectStore.getState().project;
+      flush();
+    }
   });
 
   let ws: WebsocketProvider | null = null;
@@ -212,7 +292,12 @@ export const getBridge = (): CollabBridge => {
   };
 
   const joinRoom = (server: string, room: string) => {
-    if (ws) ws.destroy();
+    if (ws) {
+      ws.awareness.off("change", peerSync);
+      unsubLocalCursor?.();
+      unsubLocalCursor = null;
+      ws.destroy();
+    }
     ws = new WebsocketProvider(server, room, doc);
     broadcastCursor();
     ws.awareness.on("change", peerSync);
@@ -220,26 +305,31 @@ export const getBridge = (): CollabBridge => {
       (s) => s.project.timeline.playhead,
       () => broadcastCursor(),
     );
+    useCollabSessionStore.getState().setRoom(room);
     if (bridge) bridge.ws = ws;
   };
   const leaveRoom = () => {
-    if (!ws) return;
-    ws.awareness.off("change", peerSync);
-    unsubLocalCursor?.();
-    unsubLocalCursor = null;
-    ws.destroy();
-    ws = null;
-    if (bridge) bridge.ws = null;
+    if (ws) {
+      ws.awareness.off("change", peerSync);
+      unsubLocalCursor?.();
+      unsubLocalCursor = null;
+      ws.destroy();
+      ws = null;
+      if (bridge) bridge.ws = null;
+    }
+    useCollabSessionStore.getState().setRoom(null);
     useAwarenessStore.getState().setPeers(new Map());
   };
 
   bridge = {
+    projectId,
     doc,
     persistence,
     ws,
     joinRoom,
     leaveRoom,
     dispose: () => {
+      if (disposed) return;
       leaveRoom();
       unsubscribe();
       // Flush any deferred change so we don't lose the last edit on teardown.
@@ -247,6 +337,7 @@ export const getBridge = (): CollabBridge => {
         clearTimeout(pending);
         flush();
       }
+      disposed = true;
       clipsMap.unobserve(onClips);
       structMap.unobserve(onStruct);
       persistence.destroy();
@@ -255,4 +346,8 @@ export const getBridge = (): CollabBridge => {
     },
   };
   return bridge;
+};
+
+export const disposeBridge = (): void => {
+  bridge?.dispose();
 };

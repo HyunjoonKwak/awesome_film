@@ -34,14 +34,14 @@ const loadPipeline = async () => {
   };
 };
 
-export const getWhisper = () => {
+const getWhisper = () => {
   if (!pipelinePromise) pipelinePromise = loadPipeline();
   return pipelinePromise;
 };
 
 // Decode any Blob (audio or video) to mono 16 kHz float samples, which is
 // the input format Whisper expects.
-export const decodeAudioForWhisper = async (blob: Blob): Promise<Float32Array> => {
+const decodeAudioForWhisper = async (blob: Blob): Promise<Float32Array> => {
   const arrayBuffer = await blob.arrayBuffer();
   const ctx = new OfflineAudioContext(1, 16_000, 16_000);
   const decoded = await ctx.decodeAudioData(arrayBuffer.slice(0));

@@ -11,17 +11,47 @@ import { getAudioEngine } from "./audio-engine";
 // once from the start position and the AudioContext clock carries it, in step
 // with the rAF picture loop in PreviewViewport.
 export function useAudioPlayback(): void {
-  const playing = usePlaybackStore((s) => s.playing);
-  const rate = usePlaybackStore((s) => s.rate);
-
   useEffect(() => {
     const engine = getAudioEngine();
-    if (playing) {
-      const { project } = useProjectStore.getState();
-      void engine.play(project, project.timeline.playhead, rate);
-    } else {
+    const start = () => {
+      const playback = usePlaybackStore.getState();
+      const project = useProjectStore.getState().project;
+      void engine.play(project, project.timeline.playhead, playback.rate).catch(() => {
+        // Autoplay policy or decode failure: stay silent without leaving a
+        // half-scheduled transport behind.
+        engine.stop();
+      });
+    };
+
+    // A vanilla Zustand subscription runs synchronously inside the click/key
+    // handler that toggles playback. That gives AudioContext.resume() the user
+    // activation browsers require, unlike starting it later from a React effect.
+    const offPlayback = usePlaybackStore.subscribe((state, previous) => {
+      if (!state.playing) {
+        engine.stop();
+      } else if (!previous.playing || state.rate !== previous.rate) {
+        start();
+      }
+    });
+    const offPlayhead = useProjectStore.subscribe(
+      (state) => state.project.timeline.playhead,
+      (playhead) => {
+        const playback = usePlaybackStore.getState();
+        if (
+          playback.playing &&
+          playback.rate > 0 &&
+          engine.isTransportDrifted(playhead, playback.rate)
+        ) {
+          start();
+        }
+      },
+    );
+
+    if (usePlaybackStore.getState().playing) start();
+    return () => {
+      offPlayback();
+      offPlayhead();
       engine.stop();
-    }
-    return () => engine.stop();
-  }, [playing, rate]);
+    };
+  }, []);
 }

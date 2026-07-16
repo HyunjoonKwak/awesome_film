@@ -1,12 +1,12 @@
 import type { Range } from "./types";
 
 export interface SilenceOpts {
-  thresholdDb: number;   // default -45
-  minSilenceMs: number;  // default 400
-  paddingMs: number;     // shrink each silence by this much
+  thresholdDb: number; // default -45
+  minSilenceMs: number; // default 400
+  paddingMs: number; // shrink each silence by this much
 }
 
-export const DEFAULT_SILENCE_OPTS: SilenceOpts = {
+const DEFAULT_SILENCE_OPTS: SilenceOpts = {
   thresholdDb: -45,
   minSilenceMs: 400,
   paddingMs: 100,

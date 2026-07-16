@@ -4,8 +4,7 @@
 export const TRACK_HEADER_W = 96;
 
 // Zoom limits in px-per-ms (0.005 = 5px/s, 1 = 1000px/s).
-export const PX_PER_MS_MIN = 0.005;
-export const PX_PER_MS_MAX = 1;
+const PX_PER_MS_MIN = 0.005;
+const PX_PER_MS_MAX = 1;
 
-export const clampZoom = (z: number): number =>
-  Math.min(PX_PER_MS_MAX, Math.max(PX_PER_MS_MIN, z));
+export const clampZoom = (z: number): number => Math.min(PX_PER_MS_MAX, Math.max(PX_PER_MS_MIN, z));

@@ -11,11 +11,7 @@ export interface ProjectMutating {
   readonly history: CommandHistory;
 }
 
-export type SetFn<S extends ProjectMutating> = (
-  fn: (s: S) => Partial<S>,
-) => void;
-export type GetFn<S extends ProjectMutating> = () => S;
-
+export type SetFn<S extends ProjectMutating> = (fn: (s: S) => Partial<S>) => void;
 // History-aware wrapper: every mutating action goes through this so undo /
 // redo work uniformly. Use a plain `set` instead when an edit is transient
 // (slider drags, playhead/zoom) and shouldn't appear in the undo stack.

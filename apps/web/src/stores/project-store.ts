@@ -1,76 +1,74 @@
 "use client";
 
-import { create } from "zustand";
-import { subscribeWithSelector } from "zustand/middleware";
 import {
-  type Project,
+  type BezierHandles,
+  type BlendMode,
   type Clip,
-  type MediaAsset,
-  type TrackKind,
+  type ClipMask,
+  type ClipTransform,
+  type CommandHistory,
+  type EasingFn,
   type ID,
+  type KeyframeTrack,
+  type Marker,
+  type MediaAsset,
   type Ms,
-  type ShapeKind,
+  type MulticamAngle,
+  type Project,
   type ShapeClip,
+  type ShapeKind,
+  type SpatialFit,
   type TextAlign,
-  createEmptyProject,
-  removeClip,
-  rippleDeleteClip,
+  type TrackKind,
+  type Transition,
   closeGapsOnTrack,
-  groupClips,
-  ungroupClips,
-  moveClipOrGroup,
-  slipClip,
-  rollEdit,
-  slideClip,
+  createEmptyProject,
+  createMulticamProgram,
   crossfadeWithPrevious,
   detachAudio,
+  duplicateClip,
+  emptyHistory,
+  findClip,
+  groupClips,
+  magneticMove,
+  moveClipOrGroup,
+  recordApplied,
+  redo as redoHistory,
+  removeClip,
+  resolvePlacement,
+  rippleDeleteClip,
+  rollEdit,
+  setClipBlendMode,
   setClipFreeze,
+  setClipMask,
+  setClipTransform,
+  setPlayhead,
+  setTransitionIn,
+  setTransitionOut,
+  setZoom,
+  slideClip,
+  slipClip,
+  snapClipStart,
+  snapMsToFrame,
+  splitClipAt,
+  switchAngleAt,
   toggleClipDisabled,
   trimClipEnd,
   trimClipStart,
-  splitClipAt,
-  setPlayhead,
-  setZoom,
-  emptyHistory,
   undo as undoHistory,
-  redo as redoHistory,
-  type CommandHistory,
-  findClip,
-  magneticMove,
-  recordApplied,
-  resolvePlacement,
-  snapClipStart,
-  snapMsToFrame,
+  ungroupClips,
   updateClip,
-  setClipTransform,
-  setClipMask,
-  setClipBlendMode,
-  setTransitionIn,
-  setTransitionOut,
-  duplicateClip,
-  createMulticamProgram,
-  switchAngleAt,
-  type MulticamAngle,
-  type Marker,
-  type ClipTransform,
-  type ClipMask,
-  type BlendMode,
-  type SpatialFit,
-  type Transition,
-  type EasingFn,
-  type BezierHandles,
-  type KeyframeTrack,
 } from "@cut/core";
+import { create } from "zustand";
+import { subscribeWithSelector } from "zustand/middleware";
+import { type TitleTemplate, createClipCreateActions } from "./actions/clip-create-actions";
+import { createEffectActions } from "./actions/effect-actions";
+import { createKeyframeActions } from "./actions/keyframe-actions";
+import { createMarkerActions } from "./actions/marker-actions";
+import { createMediaActions } from "./actions/media-actions";
+import { createTrackActions } from "./actions/track-actions";
 import { runWith } from "./store-helpers";
 import { useTimelineUiStore } from "./timeline-ui-store";
-import { createMarkerActions } from "./actions/marker-actions";
-import { createKeyframeActions } from "./actions/keyframe-actions";
-import { createTrackActions } from "./actions/track-actions";
-import { createMediaActions } from "./actions/media-actions";
-import { createEffectActions } from "./actions/effect-actions";
-import { createClipCreateActions, type TitleTemplate } from "./actions/clip-create-actions";
-
-export type { TitleTemplate };
 
 interface ProjectStoreState {
   project: Project;
@@ -82,14 +80,50 @@ interface ProjectStoreState {
   setResolution: (w: number, h: number) => void;
   addMediaAsset: (asset: MediaAsset) => void;
   removeMediaAsset: (assetId: ID) => void;
-  setAssetProxy: (assetId: ID, proxy: { proxyPath: string; proxyWidth: number; proxyHeight: number }) => void;
+  setAssetProxy: (
+    assetId: ID,
+    proxy: { proxyPath: string; proxyWidth: number; proxyHeight: number },
+  ) => void;
   addNewTrack: (kind: TrackKind) => void;
   addTextClipAtPlayhead: (text?: string) => void;
   addShapeClipAtPlayhead: (shape: ShapeKind) => void;
   addAdjustmentClipAtPlayhead: () => void;
   addTitleTemplate: (kind: TitleTemplate) => void;
-  updateShapeClip: (clipId: ID, patch: Partial<Pick<ShapeClip, "shape" | "fill" | "stroke" | "strokeWidth" | "cornerRadius" | "fillType" | "fillColor2" | "gradientAngle">>) => void;
-  updateTextClip: (clipId: ID, patch: { text?: string; size?: number; color?: string; bgColor?: string | undefined; font?: string; weight?: number; align?: TextAlign; strokeColor?: string; strokeWidth?: number; shadow?: boolean; shadowBlur?: number; animIn?: string; animOut?: string; animMs?: number }) => void;
+  updateShapeClip: (
+    clipId: ID,
+    patch: Partial<
+      Pick<
+        ShapeClip,
+        | "shape"
+        | "fill"
+        | "stroke"
+        | "strokeWidth"
+        | "cornerRadius"
+        | "fillType"
+        | "fillColor2"
+        | "gradientAngle"
+      >
+    >,
+  ) => void;
+  updateTextClip: (
+    clipId: ID,
+    patch: {
+      text?: string;
+      size?: number;
+      color?: string;
+      bgColor?: string | undefined;
+      font?: string;
+      weight?: number;
+      align?: TextAlign;
+      strokeColor?: string;
+      strokeWidth?: number;
+      shadow?: boolean;
+      shadowBlur?: number;
+      animIn?: string;
+      animOut?: string;
+      animMs?: number;
+    },
+  ) => void;
   removeTrackById: (trackId: ID) => void;
   toggleTrackMute: (trackId: ID) => void;
   toggleTrackLock: (trackId: ID) => void;
@@ -103,7 +137,11 @@ interface ProjectStoreState {
   slideClipBy: (clipId: ID, deltaMs: Ms) => void;
   crossfadeWith: (clipId: ID, durationMs?: Ms) => void;
   detachAudioFrom: (clipId: ID) => void;
-  upsertEffectFor: (clipId: ID, type: string, params: Record<string, number | string | boolean>) => void;
+  upsertEffectFor: (
+    clipId: ID,
+    type: string,
+    params: Record<string, number | string | boolean>,
+  ) => void;
   toggleClipDisabledById: (clipId: ID) => void;
   toggleFreezeAtPlayhead: (clipId: ID) => void;
   moveClipBy: (clipId: ID, deltaMs: Ms) => void;
@@ -135,13 +173,24 @@ interface ProjectStoreState {
   removeKeyframe: (clipId: ID, target: string, atMs: Ms) => void;
   clearKeyframeTrack: (clipId: ID, target: string) => void;
   pasteKeyframesTo: (clipId: ID, tracks: readonly KeyframeTrack[]) => void;
-  setKeyframeEasing: (clipId: ID, target: string, atMs: Ms, easing: EasingFn, bezier?: BezierHandles) => void;
+  setKeyframeEasing: (
+    clipId: ID,
+    target: string,
+    atMs: Ms,
+    easing: EasingFn,
+    bezier?: BezierHandles,
+  ) => void;
   setClipSpeed: (clipId: ID, speed: number) => void;
   setClipVolume: (clipId: ID, volume: number) => void;
   setClipFit: (clipId: ID, fit: SpatialFit) => void;
   addEffect: (clipId: ID, type: string) => void;
   removeEffect: (clipId: ID, effectId: ID) => void;
-  setEffectParamValue: (clipId: ID, effectId: ID, key: string, value: number | string | boolean) => void;
+  setEffectParamValue: (
+    clipId: ID,
+    effectId: ID,
+    key: string,
+    value: number | string | boolean,
+  ) => void;
   toggleEffect: (clipId: ID, effectId: ID) => void;
   setPlayheadMs: (ms: Ms) => void;
   setZoomLevel: (zoom: number) => void;
@@ -255,17 +304,13 @@ export const useProjectStore = create<ProjectStoreState>()(
       });
     },
 
-    groupSelected: (clipIds) =>
-      runWith(set, "Group clips", (p) => groupClips(p, clipIds)),
+    groupSelected: (clipIds) => runWith(set, "Group clips", (p) => groupClips(p, clipIds)),
 
-    ungroupClip: (clipId) =>
-      runWith(set, "Ungroup clips", (p) => ungroupClips(p, clipId)),
+    ungroupClip: (clipId) => runWith(set, "Ungroup clips", (p) => ungroupClips(p, clipId)),
 
-    removeClipById: (clipId) =>
-      runWith(set, "Delete clip", (p) => removeClip(p, clipId)),
+    removeClipById: (clipId) => runWith(set, "Delete clip", (p) => removeClip(p, clipId)),
 
-    rippleDeleteById: (clipId) =>
-      runWith(set, "Ripple delete", (p) => rippleDeleteClip(p, clipId)),
+    rippleDeleteById: (clipId) => runWith(set, "Ripple delete", (p) => rippleDeleteClip(p, clipId)),
 
     closeGapsForClip: (clipId) =>
       runWith(set, "Close gaps", (p) => {
@@ -273,8 +318,7 @@ export const useProjectStore = create<ProjectStoreState>()(
         return track ? closeGapsOnTrack(p, track.id) : p;
       }),
 
-    trimEnd: (clipId, newEnd) =>
-      runWith(set, "Trim clip", (p) => trimClipEnd(p, clipId, newEnd)),
+    trimEnd: (clipId, newEnd) => runWith(set, "Trim clip", (p) => trimClipEnd(p, clipId, newEnd)),
 
     trimStart: (clipId, newStart) =>
       runWith(set, "Trim clip", (p) => trimClipStart(p, clipId, newStart)),
@@ -289,8 +333,7 @@ export const useProjectStore = create<ProjectStoreState>()(
         })),
       ),
 
-    rollEditBy: (clipId, deltaMs) =>
-      runWith(set, "Roll edit", (p) => rollEdit(p, clipId, deltaMs)),
+    rollEditBy: (clipId, deltaMs) => runWith(set, "Roll edit", (p) => rollEdit(p, clipId, deltaMs)),
 
     slideClipBy: (clipId, deltaMs) =>
       runWith(set, "Slide clip", (p) => slideClip(p, clipId, deltaMs)),
@@ -298,8 +341,7 @@ export const useProjectStore = create<ProjectStoreState>()(
     crossfadeWith: (clipId, durationMs = 500) =>
       runWith(set, "Audio crossfade", (p) => crossfadeWithPrevious(p, clipId, durationMs)),
 
-    detachAudioFrom: (clipId) =>
-      runWith(set, "Detach audio", (p) => detachAudio(p, clipId)),
+    detachAudioFrom: (clipId) => runWith(set, "Detach audio", (p) => detachAudio(p, clipId)),
 
     slipClipBy: (clipId, deltaMs) =>
       // No history entry for smooth slider drags; mirrors setTransform.
@@ -326,8 +368,7 @@ export const useProjectStore = create<ProjectStoreState>()(
         return setClipFreeze(p, clipId, held);
       }),
 
-    splitAt: (clipId, at) =>
-      runWith(set, "Split clip", (p) => splitClipAt(p, clipId, at)),
+    splitAt: (clipId, at) => runWith(set, "Split clip", (p) => splitClipAt(p, clipId, at)),
 
     // FCP-style blade-all (Cmd+B): split every clip under `at` on every
     // track in a single undoable command. No-op (and no history entry)
@@ -349,8 +390,7 @@ export const useProjectStore = create<ProjectStoreState>()(
       // Skip history entry for smooth slider drags.
       set((s) => ({ project: setClipTransform(s.project, clipId, patch) })),
 
-    setMask: (clipId, mask) =>
-      runWith(set, "Set mask", (p) => setClipMask(p, clipId, mask)),
+    setMask: (clipId, mask) => runWith(set, "Set mask", (p) => setClipMask(p, clipId, mask)),
 
     setBlendMode: (clipId, mode) =>
       runWith(set, "Set blend mode", (p) => setClipBlendMode(p, clipId, mode)),
@@ -365,8 +405,7 @@ export const useProjectStore = create<ProjectStoreState>()(
     setTransitionOutFor: (clipId, transition) =>
       runWith(set, "Set transition out", (p) => setTransitionOut(p, clipId, transition)),
 
-    duplicateClipById: (clipId) =>
-      runWith(set, "Duplicate clip", (p) => duplicateClip(p, clipId)),
+    duplicateClipById: (clipId) => runWith(set, "Duplicate clip", (p) => duplicateClip(p, clipId)),
 
     setClipSpeed: (clipId, speed) =>
       runWith(set, "Set speed", (p) =>

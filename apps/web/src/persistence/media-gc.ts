@@ -2,6 +2,24 @@ import type { Project } from "@cut/core";
 import { deleteMediaFile, listMediaKeys } from "./opfs";
 import { getProject, listProjectsLibrary } from "./project-library";
 
+const mediaLeases = new Map<string, number>();
+
+// A producer holds a lease from before the OPFS write until its project
+// metadata is committed. Startup GC must not reap files in that atomic gap.
+export const leaseMediaKey = (key: string): (() => void) => {
+  mediaLeases.set(key, (mediaLeases.get(key) ?? 0) + 1);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    const remaining = (mediaLeases.get(key) ?? 1) - 1;
+    if (remaining <= 0) mediaLeases.delete(key);
+    else mediaLeases.set(key, remaining);
+  };
+};
+
+export const isMediaKeyLeased = (key: string): boolean => mediaLeases.has(key);
+
 const collectKeys = (p: Project, keep: Set<string>): void => {
   for (const a of p.mediaLibrary) {
     if (a.opfsPath) keep.add(a.opfsPath);
@@ -26,7 +44,7 @@ export const collectMediaGarbage = async (current: Project): Promise<number> => 
 
   let removed = 0;
   for (const key of await listMediaKeys()) {
-    if (!keep.has(key)) {
+    if (!keep.has(key) && !isMediaKeyLeased(key)) {
       await deleteMediaFile(key);
       removed++;
     }

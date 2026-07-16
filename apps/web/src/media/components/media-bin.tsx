@@ -1,7 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FolderUp, Music, Image as ImageIcon, Film, Layers, Loader2, Search, Trash2 } from "lucide-react";
+import {
+  FolderUp,
+  Music,
+  Image as ImageIcon,
+  Film,
+  Layers,
+  Loader2,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useProjectStore } from "@/stores/project-store";
 import { useTimelineUiStore } from "@/stores/timeline-ui-store";
@@ -44,7 +53,11 @@ export function MediaBin() {
           toast.error(t("media.proxyUnsupported"), { id: toastId });
           return;
         }
-        setAssetProxy(asset.id, result);
+        try {
+          setAssetProxy(asset.id, result);
+        } finally {
+          result.releaseLease();
+        }
         toast.success(t("media.proxyDone"), { id: toastId });
       } catch (err) {
         toast.error(`${t("media.proxyFailed")}: ${err instanceof Error ? err.message : err}`, {
@@ -59,9 +72,7 @@ export function MediaBin() {
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<MediaKind | "all">("all");
-  const [usage, setUsage] = useState<{ usageBytes: number; quotaBytes: number } | null>(
-    null,
-  );
+  const [usage, setUsage] = useState<{ usageBytes: number; quotaBytes: number } | null>(null);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-query storage only when the library size changes, not on every metadata edit.
   useEffect(() => {
@@ -84,10 +95,7 @@ export function MediaBin() {
     const targetKind = asset.kind === "audio" ? "audio" : "video";
     const track = store.project.timeline.tracks.find((tr) => tr.kind === targetKind);
     if (!track) return;
-    const startMs = track.clips.reduce(
-      (max, c) => Math.max(max, c.start + c.duration),
-      0,
-    );
+    const startMs = track.clips.reduce((max, c) => Math.max(max, c.start + c.duration), 0);
     store.addClipToTrack(track.id, {
       kind: "media",
       id: newId(),
@@ -160,9 +168,7 @@ export function MediaBin() {
                 onClick={() => setFilter(k)}
                 className={cn(
                   "rounded px-1.5 py-0.5 text-3xs uppercase tracking-wider",
-                  filter === k
-                    ? "bg-accent text-accent-fg"
-                    : "text-ink-3 hover:text-ink-1",
+                  filter === k ? "bg-accent text-accent-fg" : "text-ink-3 hover:text-ink-1",
                 )}
               >
                 {k}
@@ -173,10 +179,7 @@ export function MediaBin() {
       )}
 
       <div
-        className={cn(
-          "relative flex-1 overflow-y-auto p-2",
-          "data-[dropping=true]:bg-accent/5",
-        )}
+        className={cn("relative flex-1 overflow-y-auto p-2", "data-[dropping=true]:bg-accent/5")}
         onDragOver={(e) => e.preventDefault()}
         onDrop={onDrop}
       >
@@ -195,9 +198,7 @@ export function MediaBin() {
         )}
 
         {filtered.length === 0 && media.length > 0 && (
-          <p className="px-2 py-6 text-center text-xs text-ink-3">
-            {t("media.noMatches")}
-          </p>
+          <p className="px-2 py-6 text-center text-xs text-ink-3">{t("media.noMatches")}</p>
         )}
 
         <ul className="grid grid-cols-2 gap-2">

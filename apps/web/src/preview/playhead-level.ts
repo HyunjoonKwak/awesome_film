@@ -1,4 +1,10 @@
-import { isMediaClip, type ID, type MediaAsset, type Project } from "@cut/core";
+import {
+  type ID,
+  type MediaAsset,
+  type Project,
+  isMediaClip,
+  sourceOffsetForRamp,
+} from "@cut/core";
 
 // Estimates the instantaneous audio level (0..1) at the current playhead by
 // sampling each audio-bearing clip's precomputed peak envelope. There is no
@@ -18,7 +24,7 @@ export const playheadLevel = (
       const peaks = asset?.waveformPeaks;
       if (!asset || !peaks || peaks.length === 0) continue;
       const dur = asset.durationMs || 1;
-      const srcMs = clip.trimIn + (at - clip.start) * clip.speed;
+      const srcMs = clip.trimIn + sourceOffsetForRamp(clip, at - clip.start);
       const bin = Math.max(0, Math.min(peaks.length - 1, Math.floor((srcMs / dur) * peaks.length)));
       const v = (peaks[bin] ?? 0) * (clip.volume ?? 1);
       // Combine tracks by taking the loudest contributor.

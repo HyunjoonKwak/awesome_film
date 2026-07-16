@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "format": "biome format --write src",
-    "knip": "pnpm --filter '@cut/web' exec knip",
+    "knip": "pnpm --dir ../.. exec knip --workspace apps/web",
     "prebundle:whisper": "node scripts/download-whisper.mjs"
   },
   "dependencies": {

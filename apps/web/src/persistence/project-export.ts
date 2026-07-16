@@ -16,22 +16,81 @@ export interface ProjectExport {
 // without enumerating the whole model, while still rejecting a file whose
 // tracks/clips/assets are missing their core shape — the gap that previously
 // let superficially-valid-but-corrupt files into the store and IndexedDB.
-const clipSchema = z
+const finite = z.number().finite();
+const nonNegative = finite.nonnegative();
+const positive = finite.positive();
+const effectParamSchema = z.union([finite, z.string(), z.boolean()]);
+const effectSchema = z
   .object({
-    id: z.string(),
-    kind: z.string(),
-    start: z.number(),
-    duration: z.number(),
-    speed: z.number(),
-    effects: z.array(z.unknown()),
-    keyframes: z.array(z.unknown()),
+    id: z.string().min(1),
+    type: z.string().min(1),
+    enabled: z.boolean(),
+    params: z.record(effectParamSchema),
   })
   .passthrough();
+const keyframeSchema = z
+  .object({
+    at: nonNegative,
+    value: finite,
+    easing: z.enum(["linear", "ease-in", "ease-out", "ease-in-out", "step", "bezier"]),
+  })
+  .passthrough();
+const keyframeTrackSchema = z
+  .object({
+    target: z.string().min(1),
+    keyframes: z.array(keyframeSchema),
+  })
+  .passthrough();
+const clipBase = {
+  id: z.string().min(1),
+  start: nonNegative,
+  duration: positive,
+  speed: finite,
+  effects: z.array(effectSchema),
+  keyframes: z.array(keyframeTrackSchema),
+};
+const clipSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      ...clipBase,
+      kind: z.literal("media"),
+      assetId: z.string().min(1),
+      trimIn: nonNegative,
+      trimOut: nonNegative,
+    })
+    .passthrough(),
+  z
+    .object({
+      ...clipBase,
+      kind: z.literal("text"),
+      text: z.string(),
+      font: z.string().min(1),
+      size: positive,
+      color: z.string().min(1),
+    })
+    .passthrough(),
+  z
+    .object({
+      ...clipBase,
+      kind: z.literal("shape"),
+      shape: z.enum(["rect", "ellipse", "line"]),
+      fill: z.string(),
+      stroke: z.string(),
+      strokeWidth: nonNegative,
+    })
+    .passthrough(),
+  z.object({ ...clipBase, kind: z.literal("adjustment") }).passthrough(),
+]);
 
 const trackSchema = z
   .object({
     id: z.string(),
-    kind: z.string(),
+    kind: z.enum(["video", "audio", "text", "overlay"]),
+    name: z.string(),
+    height: positive,
+    muted: z.boolean(),
+    solo: z.boolean(),
+    locked: z.boolean(),
     clips: z.array(clipSchema),
   })
   .passthrough();
@@ -40,10 +99,11 @@ const mediaAssetSchema = z
   .object({
     id: z.string(),
     name: z.string(),
-    kind: z.string(),
+    kind: z.enum(["video", "audio", "image"]),
     mime: z.string(),
-    durationMs: z.number(),
-    opfsPath: z.string(),
+    durationMs: nonNegative,
+    opfsPath: z.string().min(1),
+    importedAt: z.number().int().nonnegative(),
   })
   .passthrough();
 
@@ -56,14 +116,14 @@ const exportSchema = z.object({
     name: z.string(),
     createdAt: z.number(),
     updatedAt: z.number(),
-    framerate: z.number(),
-    resolution: z.object({ w: z.number(), h: z.number() }),
+    framerate: positive,
+    resolution: z.object({ w: positive, h: positive }),
     timeline: z.object({
       tracks: z.array(trackSchema),
-      playhead: z.number(),
-      zoom: z.number(),
+      playhead: nonNegative,
+      zoom: positive,
       magnetic: z.boolean(),
-      duration: z.number(),
+      duration: nonNegative,
     }),
     mediaLibrary: z.array(mediaAssetSchema),
   }) as unknown as z.ZodType<Project>,
@@ -81,7 +141,12 @@ export const parseProjectExport = (raw: unknown): ProjectExport => {
   // Refuse a file written by a newer app version rather than silently importing
   // a format we don't understand. Older versions would migrate here; v1 is
   // currently the only version.
-  if (env.version > PROJECT_VERSION) {
+  if (env.version !== PROJECT_VERSION) {
+    if (env.version < PROJECT_VERSION) {
+      throw new Error(
+        `This project uses an unsupported older format (file v${env.version}, this app v${PROJECT_VERSION}).`,
+      );
+    }
     throw new Error(
       `This project needs a newer version of the app (file v${env.version}, this app v${PROJECT_VERSION}).`,
     );
@@ -102,4 +167,5 @@ export const downloadProjectJson = (project: Project): void => {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
-const sanitize = (s: string): string => s.replace(/[^a-z0-9_\-]+/gi, "_").slice(0, 60) || "untitled";
+const sanitize = (s: string): string =>
+  s.replace(/[^a-z0-9_\-]+/gi, "_").slice(0, 60) || "untitled";

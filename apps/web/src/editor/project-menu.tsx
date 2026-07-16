@@ -1,19 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import * as Dialog from "@radix-ui/react-dialog";
-import { FilePlus, FolderOpen, Trash2, Upload, Download, X } from "lucide-react";
-import { toast } from "sonner";
-import { createEmptyProject, type Project } from "@cut/core";
-import { useProjectStore } from "@/stores/project-store";
 import { useT } from "@/i18n/use-t";
+import { downloadProjectJson, parseProjectExport } from "@/persistence/project-export";
 import {
   deleteStoredProject,
   listProjectsLibrary,
   setActiveProjectId,
   upsertProject,
 } from "@/persistence/project-library";
-import { downloadProjectJson, parseProjectExport } from "@/persistence/project-export";
+import { useProjectStore } from "@/stores/project-store";
+import { type Project, createEmptyProject } from "@cut/core";
+import * as Dialog from "@radix-ui/react-dialog";
+import { Download, FilePlus, FolderOpen, Trash2, Upload, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 interface StoredRow {
   id: string;
@@ -24,17 +24,59 @@ interface StoredRow {
 export function ProjectMenu() {
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<StoredRow[]>([]);
-  const project = useProjectStore((s) => s.project);
+  const projectId = useProjectStore((s) => s.project.id);
   const loadProject = useProjectStore((s) => s.loadProject);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const t = useT();
 
-  // Auto-save active project into the multi-project library whenever it
-  // changes — so reopening picks up the latest state without manual save.
+  // Subscribe once and persist only content changes. ProjectMenu previously
+  // re-rendered and reset its save timer for every playback playhead tick.
   useEffect(() => {
-    void upsertProject(project);
-    void setActiveProjectId(project.id);
-  }, [project]);
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let queued = useProjectStore.getState().project;
+    const schedule = (project: Project) => {
+      queued = project;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        void upsertProject(queued);
+      }, 300);
+    };
+    schedule(queued);
+
+    const unsubscribe = useProjectStore.subscribe(
+      (state) => state.project,
+      (project, previous) => {
+        // Playhead, zoom, duration, and updatedAt are local/derived state. All
+        // editable shared content is covered by these referential boundaries.
+        const contentChanged =
+          project.id !== previous.id ||
+          project.name !== previous.name ||
+          project.createdAt !== previous.createdAt ||
+          project.framerate !== previous.framerate ||
+          project.resolution !== previous.resolution ||
+          project.mediaLibrary !== previous.mediaLibrary ||
+          project.timeline.tracks !== previous.timeline.tracks ||
+          project.timeline.magnetic !== previous.timeline.magnetic ||
+          project.timeline.markers !== previous.timeline.markers;
+        if (contentChanged) schedule(project);
+      },
+    );
+
+    return () => {
+      unsubscribe();
+      if (timer) {
+        clearTimeout(timer);
+        void upsertProject(queued);
+      }
+    };
+  }, []);
+
+  // The active pointer is identity-only and should update immediately on a
+  // project switch, independently from the debounced snapshot write.
+  useEffect(() => {
+    void setActiveProjectId(projectId);
+  }, [projectId]);
 
   useEffect(() => {
     if (!open) return;
@@ -71,7 +113,7 @@ export function ProjectMenu() {
     await refresh();
   };
 
-  const onExport = () => downloadProjectJson(project);
+  const onExport = () => downloadProjectJson(useProjectStore.getState().project);
 
   const onImport = async (file: File) => {
     try {
@@ -83,20 +125,14 @@ export function ProjectMenu() {
       setOpen(false);
       toast.success(t("project.imported", { name: env.project.name }));
     } catch (err) {
-      toast.error(
-        `${t("project.importFailed")}: ${err instanceof Error ? err.message : err}`,
-      );
+      toast.error(`${t("project.importFailed")}: ${err instanceof Error ? err.message : err}`);
     }
   };
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
-        <button
-          type="button"
-          className="btn-ghost px-2 py-1 text-xs"
-          title={t("project.menu")}
-        >
+        <button type="button" className="btn-ghost px-2 py-1 text-xs" title={t("project.menu")}>
           <FolderOpen className="size-3.5" />
           {t("project.menu")}
         </button>
@@ -147,9 +183,7 @@ export function ProjectMenu() {
 
           <ul className="mt-4 max-h-72 space-y-1 overflow-y-auto">
             {rows.length === 0 && (
-              <li className="px-2 py-6 text-center text-xs text-ink-3">
-                {t("project.empty")}
-              </li>
+              <li className="px-2 py-6 text-center text-xs text-ink-3">{t("project.empty")}</li>
             )}
             {rows.map((row) => (
               <li

@@ -3,11 +3,11 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export interface StoredLut {
+interface StoredLut {
   readonly id: string;
   readonly name: string;
   readonly size: number;
-  readonly raw: string;        // original .cube text, so we can round-trip
+  readonly raw: string; // original .cube text, so we can round-trip
 }
 
 interface LutState {
@@ -21,8 +21,7 @@ export const useLutStore = create<LutState>()(
   persist(
     (set, get) => ({
       luts: [],
-      addLut: (lut) =>
-        set((s) => ({ luts: [...s.luts.filter((x) => x.id !== lut.id), lut] })),
+      addLut: (lut) => set((s) => ({ luts: [...s.luts.filter((x) => x.id !== lut.id), lut] })),
       removeLut: (id) => set((s) => ({ luts: s.luts.filter((l) => l.id !== id) })),
       getLut: (id) => get().luts.find((l) => l.id === id),
     }),

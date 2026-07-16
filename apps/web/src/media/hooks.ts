@@ -24,8 +24,12 @@ export const useMediaImport = (): ImportState => {
       try {
         for (const file of files) {
           // process serially to keep memory bounded
-          const { asset } = await importMediaFile(file);
-          addMediaAsset(asset);
+          const { asset, releaseLease } = await importMediaFile(file);
+          try {
+            addMediaAsset(asset);
+          } finally {
+            releaseLease();
+          }
         }
         toast.success(t("media.imported", { n: files.length }), { id: toastId });
       } catch (err) {

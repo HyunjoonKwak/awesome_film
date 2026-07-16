@@ -87,7 +87,7 @@ export interface DenoiseOpts {
   readonly noiseEstimateMs: number;
 }
 
-export const DEFAULT_DENOISE: DenoiseOpts = {
+const DEFAULT_DENOISE: DenoiseOpts = {
   strength: 1.0,
   floor: 0.1,
   noiseEstimateMs: 250,
@@ -117,7 +117,11 @@ const estimateNoise = (pcm: Float32Array, sampleRate: number, ms: number): Float
   return mag;
 };
 
-export const denoise = (pcm: Float32Array, sampleRate: number, opts: Partial<DenoiseOpts> = {}): Float32Array => {
+export const denoise = (
+  pcm: Float32Array,
+  sampleRate: number,
+  opts: Partial<DenoiseOpts> = {},
+): Float32Array => {
   const { strength, floor, noiseEstimateMs } = { ...DEFAULT_DENOISE, ...opts };
   if (pcm.length < FFT_SIZE * 2) return pcm.slice();
 

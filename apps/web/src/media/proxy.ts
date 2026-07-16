@@ -1,5 +1,6 @@
-import { newId, type MediaAsset } from "@cut/core";
-import { readMediaFile, writeMediaFile, getMediaUrl } from "@/persistence/opfs";
+import { leaseMediaKey } from "@/persistence/media-gc";
+import { getMediaUrl, writeMediaFile } from "@/persistence/opfs";
+import { type MediaAsset, newId } from "@cut/core";
 
 // Generate a low-res proxy of a video asset. We re-encode via WebCodecs +
 // mp4-muxer at a reduced resolution so the editor can scrub a lighter file.
@@ -15,6 +16,7 @@ export interface ProxyResult {
   proxyPath: string;
   proxyWidth: number;
   proxyHeight: number;
+  releaseLease: () => void;
 }
 
 export const generateProxy = async (
@@ -55,9 +57,12 @@ export const generateProxy = async (
     fastStart: "in-memory",
     firstTimestampBehavior: "offset",
   });
+  let encoderError: Error | null = null;
   const encoder = new VideoEncoder({
     output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
-    error: (e) => console.warn("proxy encoder error:", e),
+    error: (error) => {
+      encoderError = error instanceof Error ? error : new Error(String(error));
+    },
   });
   encoder.configure({
     codec: "avc1.42001f",
@@ -92,20 +97,19 @@ export const generateProxy = async (
     if (f % 8 === 0) onProgress?.(f / totalFrames);
   }
   await encoder.flush();
+  if (encoderError) throw encoderError;
   muxer.finalize();
   encoder.close();
   onProgress?.(1);
 
   const blob = new Blob([muxer.target.buffer], { type: "video/mp4" });
   const proxyPath = `${newId()}__proxy.mp4`;
-  await writeMediaFile(proxyPath, new File([blob], proxyPath, { type: "video/mp4" }));
-  return { proxyPath, proxyWidth: pw, proxyHeight: ph };
+  const releaseLease = leaseMediaKey(proxyPath);
+  try {
+    await writeMediaFile(proxyPath, new File([blob], proxyPath, { type: "video/mp4" }));
+    return { proxyPath, proxyWidth: pw, proxyHeight: ph, releaseLease };
+  } catch (error) {
+    releaseLease();
+    throw error;
+  }
 };
-
-// Resolve which OPFS path to use for editing/preview: proxy if present and
-// proxy mode is on, else the original.
-export const sourcePathForEditing = (asset: MediaAsset, useProxy: boolean): string =>
-  useProxy && asset.proxyPath ? asset.proxyPath : asset.opfsPath;
-
-// readMediaFile re-export keeps proxy consumers from importing opfs directly.
-export { readMediaFile };

@@ -1,33 +1,33 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { FolderOpen, Sliders, X } from "lucide-react";
-import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { TopBar } from "./top-bar";
-import { MediaBin } from "@/media/components/media-bin";
-import { PreviewViewport } from "@/preview/preview-viewport";
-import { TransportBar } from "@/preview/transport-bar";
-import { TimelinePanel } from "@/timeline/components/timeline-panel";
-import { InspectorPanel } from "./inspector-panel";
-import { RightPanel } from "./right-panel";
-import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import { useCollab } from "@/collab/use-collab";
+import { ErrorBoundary } from "@/components/error-boundary";
+import { useIsBelow } from "@/hooks/use-breakpoint";
 import { useGlobalFileDrop } from "@/hooks/use-global-file-drop";
 import { useIsDesktopApp } from "@/hooks/use-is-desktop-app";
-import { useCollab } from "@/collab/use-collab";
-import { useIsBelow } from "@/hooks/use-breakpoint";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { cn } from "@/lib/cn";
-import { usePluginHost } from "@/plugins/use-plugin-host";
-import { CommandPalette } from "./command-palette";
-import { ShortcutCheatsheet } from "./shortcut-cheatsheet";
-import { ErrorBoundary } from "@/components/error-boundary";
-import { useProjectStore } from "@/stores/project-store";
+import { MediaBin } from "@/media/components/media-bin";
 import { collectMediaGarbage } from "@/persistence/media-gc";
+import { usePluginHost } from "@/plugins/use-plugin-host";
+import { PreviewViewport } from "@/preview/preview-viewport";
+import { TransportBar } from "@/preview/transport-bar";
 import { useAudioPlayback } from "@/preview/use-audio-playback";
+import { useProjectStore } from "@/stores/project-store";
+import { TimelinePanel } from "@/timeline/components/timeline-panel";
+import { FolderOpen, Sliders, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import { CommandPalette } from "./command-palette";
+import { InspectorPanel } from "./inspector-panel";
+import { RightPanel } from "./right-panel";
+import { ShortcutCheatsheet } from "./shortcut-cheatsheet";
+import { TopBar } from "./top-bar";
 
 export function EditorShell() {
   useKeyboardShortcuts();
   useGlobalFileDrop();
-  useCollab();
+  const persistenceReady = useCollab();
   usePluginHost();
   useAudioPlayback();
   const isMobile = useIsBelow(900);
@@ -37,11 +37,20 @@ export function EditorShell() {
   // project has settled. Undo-safe: deletion keeps blobs, GC only reaps ones
   // unreachable from any saved or current project.
   useEffect(() => {
+    if (!persistenceReady) return;
     const id = setTimeout(() => {
       void collectMediaGarbage(useProjectStore.getState().project).catch(() => {});
     }, 3000);
     return () => clearTimeout(id);
-  }, []);
+  }, [persistenceReady]);
+
+  if (!persistenceReady) {
+    return (
+      <div className="flex h-full items-center justify-center bg-panel-0 text-xs text-ink-3">
+        Loading project…
+      </div>
+    );
+  }
 
   if (isMobile) return <MobileShell />;
   return (

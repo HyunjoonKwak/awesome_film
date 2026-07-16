@@ -2,9 +2,7 @@
 // real WebGL renderer; for now the registry shape is fixed so effect authors
 // can land definitions without waiting for the runtime.
 
-export type ParamKind = "number" | "boolean" | "color" | "enum";
-
-export interface NumberParam {
+interface NumberParam {
   kind: "number";
   key: string;
   label: string;
@@ -14,21 +12,21 @@ export interface NumberParam {
   default: number;
 }
 
-export interface BooleanParam {
+interface BooleanParam {
   kind: "boolean";
   key: string;
   label: string;
   default: boolean;
 }
 
-export interface ColorParam {
+interface ColorParam {
   kind: "color";
   key: string;
   label: string;
   default: string; // hex
 }
 
-export interface EnumParam {
+interface EnumParam {
   kind: "enum";
   key: string;
   label: string;
@@ -36,11 +34,11 @@ export interface EnumParam {
   default: string;
 }
 
-export type ParamDef = NumberParam | BooleanParam | ColorParam | EnumParam;
+type ParamDef = NumberParam | BooleanParam | ColorParam | EnumParam;
 
-export type EffectParams = Readonly<Record<string, number | boolean | string>>;
+type EffectParams = Readonly<Record<string, number | boolean | string>>;
 
-export interface EffectPass {
+interface EffectPass {
   readonly shader: string; // identifier into the shader registry
   readonly uniforms: (ctx: { params: EffectParams; width: number; height: number }) => Record<
     string,
@@ -56,4 +54,3 @@ export interface EffectDefinition {
   readonly params: readonly ParamDef[];
   readonly passes: readonly EffectPass[];
 }
-

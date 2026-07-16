@@ -2,10 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { VideoFrameCache } from "../video-frame-cache";
 
 // Minimal VideoFrame stub for jsdom — only the fields the cache touches.
-const stubFrame = (timestamp: number) => ({
-  timestamp,
-  close: vi.fn(),
-}) as unknown as VideoFrame;
+const stubFrame = (timestamp: number) =>
+  ({
+    timestamp,
+    close: vi.fn(),
+  }) as unknown as VideoFrame;
 
 describe("VideoFrameCache", () => {
   it("stores and recalls the nearest frame", () => {
@@ -21,6 +22,13 @@ describe("VideoFrameCache", () => {
     const c = new VideoFrameCache();
     c.store("a", stubFrame(0));
     expect(c.nearest("b", 0)).toBeNull();
+  });
+
+  it("rejects a nearest frame outside the requested tolerance", () => {
+    const c = new VideoFrameCache();
+    c.store("a", stubFrame(2_000_000));
+    expect(c.nearest("a", 0, 100_000)).toBeNull();
+    expect(c.nearest("a", 1_950_000, 100_000)?.timestampUs).toBe(2_000_000);
   });
 
   it("evicts the oldest entry past the limit", () => {

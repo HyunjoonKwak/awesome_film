@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 
-export type SaveState = "idle" | "saving" | "saved";
+type SaveState = "idle" | "saving" | "saved";
 
 interface SaveStore {
   state: SaveState;

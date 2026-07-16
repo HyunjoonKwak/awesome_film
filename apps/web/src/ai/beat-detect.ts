@@ -1,9 +1,9 @@
 export interface BeatOpts {
   sensitivity: number; // energy must exceed local average × this to count
-  minGapMs: number;    // minimum spacing between detected beats
+  minGapMs: number; // minimum spacing between detected beats
 }
 
-export const DEFAULT_BEAT_OPTS: BeatOpts = {
+const DEFAULT_BEAT_OPTS: BeatOpts = {
   sensitivity: 1.4,
   minGapMs: 250,
 };

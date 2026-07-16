@@ -76,4 +76,26 @@ describe("project-export", () => {
     const env = toProjectExport(createEmptyProject());
     expect(() => parseProjectExport({ ...env, version: env.version + 1 })).toThrow();
   });
+
+  it("rejects an older version until an explicit migration exists", () => {
+    const env = toProjectExport(createEmptyProject());
+    expect(() => parseProjectExport({ ...env, version: 0 })).toThrow(/older format/);
+  });
+
+  it("rejects unknown discriminants and incomplete tracks", () => {
+    const good = toProjectExport(createEmptyProject());
+    const track = good.project.timeline.tracks[0];
+    expect(track).toBeDefined();
+    const corrupt = {
+      ...good,
+      project: {
+        ...good.project,
+        timeline: {
+          ...good.project.timeline,
+          tracks: [{ ...track, kind: "mystery", locked: undefined }],
+        },
+      },
+    };
+    expect(() => parseProjectExport(corrupt)).toThrow();
+  });
 });
