@@ -4,9 +4,8 @@
 //
 //   localStorage.setItem("cut.plugins", JSON.stringify(["/plugins/example-grayscale.js"]))
 //
-// You can also register effects at any time from the browser console:
-//   cutEditor.registerEffect({ ... })
-//   cutEditor.registerShader("my-id", `#version 300 es ...`)
+// Plugins execute in a sandboxed iframe and can only register serializable
+// effect/shader definitions through the v2 SDK.
 
 const { registerEffect, registerShader } = window.cutEditor;
 
@@ -37,7 +36,8 @@ registerEffect({
   passes: [
     {
       shader: "grayscale",
-      uniforms: ({ params }) => ({ u_amount: Number(params.amount ?? 1) }),
+      // A string binding reads the named effect parameter at render time.
+      uniforms: { u_amount: "amount" },
     },
   ],
 });

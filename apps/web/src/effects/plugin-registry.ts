@@ -18,8 +18,7 @@ export const unregisterEffect = (type: string): void => {
   emit();
 };
 
-export const getPluginEffects = (): readonly EffectDefinition[] =>
-  Array.from(plugins.values());
+export const getPluginEffects = (): readonly EffectDefinition[] => Array.from(plugins.values());
 
 export const subscribeEffects = (fn: PluginListener): (() => void) => {
   listeners.add(fn);
@@ -38,24 +37,8 @@ export const registerShader = (id: string, fragmentSource: string): void => {
   shaders.set(id, { fs: fragmentSource });
 };
 
-export const getPluginShader = (id: string): { fs: string } | undefined =>
-  shaders.get(id);
-
-// Public entry point exposed on `window` so plugins loaded as <script>
-// tags or via dynamic import can find the SDK.
-export interface CutEditorPluginSdk {
-  readonly version: 1;
-  registerEffect: typeof registerEffect;
-  unregisterEffect: typeof unregisterEffect;
-  registerShader: typeof registerShader;
-}
-
-export const installPluginSdk = (): void => {
-  if (typeof window === "undefined") return;
-  (window as unknown as { cutEditor?: CutEditorPluginSdk }).cutEditor = {
-    version: 1,
-    registerEffect,
-    unregisterEffect,
-    registerShader,
-  };
+export const unregisterShader = (id: string): void => {
+  shaders.delete(id);
 };
+
+export const getPluginShader = (id: string): { fs: string } | undefined => shaders.get(id);
