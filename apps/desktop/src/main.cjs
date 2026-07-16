@@ -69,7 +69,12 @@ const mimeFromExt = (ext) => {
 // export emits trailing-slash directories with index.html, so we mirror that.
 const resolveAppPath = (urlPath) => {
   // Strip query string, decode, normalise.
-  const cleaned = decodeURIComponent(urlPath.split("?")[0].split("#")[0]);
+  let cleaned;
+  try {
+    cleaned = decodeURIComponent(urlPath.split("?")[0].split("#")[0]);
+  } catch {
+    return null;
+  }
   // Block path traversal.
   if (cleaned.includes("..")) return null;
   let rel = cleaned.replace(/^\/+/, "");
@@ -93,7 +98,16 @@ const windowStateFile = () => path.join(app.getPath("userData"), "window-state.j
 
 const loadWindowState = () => {
   try {
-    return JSON.parse(fs.readFileSync(windowStateFile(), "utf8"));
+    const value = JSON.parse(fs.readFileSync(windowStateFile(), "utf8"));
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+
+    const state = {};
+    if (Number.isFinite(value.width)) state.width = Math.min(10_000, Math.max(960, value.width));
+    if (Number.isFinite(value.height)) state.height = Math.min(10_000, Math.max(600, value.height));
+    if (Number.isFinite(value.x)) state.x = value.x;
+    if (Number.isFinite(value.y)) state.y = value.y;
+    state.maximized = value.maximized === true;
+    return state;
   } catch {
     return null;
   }
@@ -151,8 +165,15 @@ const createWindow = () => {
     }
   };
   const openExternal = (url) => {
-    if (url.startsWith("https://") || url.startsWith("http://")) {
-      void shell.openExternal(url);
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return;
+      void shell.openExternal(parsed.toString()).catch((err) => {
+        // biome-ignore lint/suspicious/noConsole: External-browser failures belong in desktop logs.
+        console.warn("[cut-desktop] could not open external link:", err?.message ?? err);
+      });
+    } catch {
+      // Invalid URLs are intentionally denied.
     }
   };
 

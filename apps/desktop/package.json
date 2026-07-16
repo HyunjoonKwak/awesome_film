@@ -3,6 +3,7 @@
   "version": "0.1.1",
   "private": true,
   "description": "Electron shell that packages the cut_editor web app as a native macOS application.",
+  "author": "Cut Editor contributors",
   "main": "src/main.cjs",
   "scripts": {
     "dev": "concurrently -k -n web,electron -c blue,green \"pnpm --filter @cut/web dev\" \"wait-on http://localhost:3000/editor && CUT_DEV_URL=http://localhost:3000 electron .\"",
