@@ -1,5 +1,6 @@
 import { createTexture, type GL } from "./gl";
 import { parseCube, type CubeLut } from "@/effects/lut/parse-cube";
+import { BoundedResourceCache } from "./bounded-resource-cache";
 
 // Unroll a cubic LUT into a single 2D tile strip of size (n*n) × n RGBA8.
 // Easier to sample on WebGL2 without 3D textures.
@@ -31,7 +32,14 @@ const unrollToImageData = (lut: CubeLut): ImageData => {
 
 // Upload (or fetch cached) LUT texture. Returns the texture + grid size for
 // the shader uniform.
-const cache = new WeakMap<GL, Map<string, { tex: WebGLTexture; size: number }>>();
+interface CachedLutTexture {
+  readonly tex: WebGLTexture;
+  readonly size: number;
+  readonly raw: string;
+}
+
+const MAX_LUT_TEXTURES = 8;
+const cache = new WeakMap<GL, BoundedResourceCache<string, CachedLutTexture>>();
 
 export const uploadLutTexture = (
   gl: GL,
@@ -40,11 +48,11 @@ export const uploadLutTexture = (
 ): { tex: WebGLTexture; size: number } => {
   let perGl = cache.get(gl);
   if (!perGl) {
-    perGl = new Map();
+    perGl = new BoundedResourceCache(MAX_LUT_TEXTURES, (entry) => gl.deleteTexture(entry.tex));
     cache.set(gl, perGl);
   }
   const cached = perGl.get(lutId);
-  if (cached) return cached;
+  if (cached?.raw === rawCube) return cached;
   const parsed = parseCube(rawCube);
   const img = unrollToImageData(parsed);
   const tex = createTexture(gl);
@@ -54,8 +62,23 @@ export const uploadLutTexture = (
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, img.width, img.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, img.data);
-  const entry = { tex, size: parsed.size };
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    0,
+    gl.RGBA,
+    img.width,
+    img.height,
+    0,
+    gl.RGBA,
+    gl.UNSIGNED_BYTE,
+    img.data,
+  );
+  const entry = { tex, size: parsed.size, raw: rawCube };
   perGl.set(lutId, entry);
   return entry;
+};
+
+export const disposeLutTextures = (gl: GL): void => {
+  cache.get(gl)?.clear();
+  cache.delete(gl);
 };

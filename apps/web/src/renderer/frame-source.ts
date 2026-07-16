@@ -1,19 +1,41 @@
 import type { MediaAsset } from "@cut/core";
 import { getMediaUrl } from "@/persistence/opfs";
 import { useProxyStore } from "@/media/proxy-store";
+import { BoundedResourceCache } from "./bounded-resource-cache";
 
 type Source = HTMLVideoElement | HTMLImageElement;
 
-// Caches HTMLImageElement and HTMLVideoElement instances per asset so we
-// avoid the cost of reloading the media on every frame. In phase 3.1 this
-// gets swapped for a WebCodecs VideoDecoder + a VideoFrame LRU cache to
-// achieve true frame-accurate scrubbing without the <video> seek dance.
+const releaseSource = (source: Source): void => {
+  if (source instanceof HTMLVideoElement) {
+    source.pause();
+    source.removeAttribute("src");
+    source.load();
+  } else {
+    source.removeAttribute("src");
+  }
+};
+
+// Bounded fallback element cache. WebCodecs handles frame-accurate video
+// decoding where available; these elements remain necessary for images,
+// unsupported codecs, and browsers without WebCodecs.
 export class FrameSourcePool {
-  private readonly cache = new Map<string, Source>();
+  private static readonly MAX_SOURCES = 12;
+  private readonly cache = new BoundedResourceCache<string, Source>(
+    FrameSourcePool.MAX_SOURCES,
+    releaseSource,
+  );
   private readonly pending = new Map<string, Promise<Source | null>>();
   private readonly retryAt = new Map<string, number>();
+  private retainedIds: ReadonlySet<string> | null = null;
+
+  retain(assetIds: ReadonlySet<string>): void {
+    this.retainedIds = assetIds;
+    this.cache.retain(assetIds);
+    for (const id of this.retryAt.keys()) if (!assetIds.has(id)) this.retryAt.delete(id);
+  }
 
   async get(asset: MediaAsset): Promise<Source | null> {
+    if (this.retainedIds && !this.retainedIds.has(asset.id)) return null;
     const cached = this.cache.get(asset.id);
     if (cached) return cached;
     if ((this.retryAt.get(asset.id) ?? 0) > Date.now()) return null;
@@ -21,11 +43,22 @@ export class FrameSourcePool {
     if (inflight) return inflight;
     const promise = this.load(asset);
     this.pending.set(asset.id, promise);
-    const loaded = await promise;
-    this.pending.delete(asset.id);
+    let loaded: Source | null = null;
+    try {
+      loaded = await promise;
+    } catch {
+      loaded = null;
+    } finally {
+      if (this.pending.get(asset.id) === promise) this.pending.delete(asset.id);
+    }
     if (loaded) {
-      this.cache.set(asset.id, loaded);
-      this.retryAt.delete(asset.id);
+      if (!this.retainedIds || this.retainedIds.has(asset.id)) {
+        this.cache.set(asset.id, loaded);
+        this.retryAt.delete(asset.id);
+      } else {
+        releaseSource(loaded);
+        loaded = null;
+      }
     } else {
       // Remote collaboration metadata can arrive before its binary file.
       // Retry with a small backoff instead of permanently caching the miss or
@@ -69,5 +102,6 @@ export class FrameSourcePool {
     this.cache.clear();
     this.pending.clear();
     this.retryAt.clear();
+    this.retainedIds = null;
   }
 }

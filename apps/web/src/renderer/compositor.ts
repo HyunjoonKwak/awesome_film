@@ -30,7 +30,8 @@ import { FrameSourcePool } from "./frame-source";
 import { renderTextToCanvas } from "./text-source";
 import { renderShapeToCanvas } from "./shape-source";
 import { getFrameProvider } from "./webcodecs-decoder";
-import { uploadLutTexture } from "./lut-texture";
+import { disposeLutTextures, uploadLutTexture } from "./lut-texture";
+import { BoundedResourceCache } from "./bounded-resource-cache";
 import { useLutStore } from "@/effects/lut/lut-store";
 import {
   animateEffects,
@@ -44,18 +45,22 @@ import {
 // chain is data-driven by `effects/registry.ts`. Bg-remove receives a mask
 // texture computed by MediaPipe; everything else just runs as fragment passes.
 export class Compositor {
+  private static readonly MAX_ASSET_TEXTURES = 24;
+  private static readonly MAX_TEXT_TEXTURES = 64;
+  private static readonly MAX_MASK_TEXTURES = 12;
   private readonly gl: GL;
   private readonly shaders: ShaderRegistry;
   private readonly quad: ReturnType<typeof createQuad>;
-  private readonly assetTextures = new Map<string, WebGLTexture>();
-  private readonly textTextures = new Map<string, WebGLTexture>();
-  private readonly bgMaskTextures = new Map<string, WebGLTexture>();
+  private readonly assetTextures: BoundedResourceCache<string, WebGLTexture>;
+  private readonly textTextures: BoundedResourceCache<string, WebGLTexture>;
+  private readonly bgMaskTextures: BoundedResourceCache<string, WebGLTexture>;
   // asset.id -> source time (s) the cached mask was computed at. MediaPipe
   // segmentation is the single most expensive per-frame op, so we skip it when
   // the underlying source frame hasn't advanced (idle re-renders, edits while
   // paused). Videos re-segment as currentTime moves; still images (no
   // currentTime) segment once and stay cached.
   private readonly bgMaskTime = new Map<string, number>();
+  private retainedAssetIds = new Set<string>();
   private readonly pingPong: PingPong;
   private readonly scratch: ScratchPool;
   // Stable slot indices for the scratch pool. Slot 0 holds the captured
@@ -67,6 +72,19 @@ export class Compositor {
 
   constructor(canvas: HTMLCanvasElement) {
     this.gl = createGL(canvas);
+    this.assetTextures = new BoundedResourceCache(Compositor.MAX_ASSET_TEXTURES, (texture) =>
+      this.gl.deleteTexture(texture),
+    );
+    this.textTextures = new BoundedResourceCache(Compositor.MAX_TEXT_TEXTURES, (texture) =>
+      this.gl.deleteTexture(texture),
+    );
+    this.bgMaskTextures = new BoundedResourceCache(
+      Compositor.MAX_MASK_TEXTURES,
+      (texture, assetId) => {
+        this.gl.deleteTexture(texture);
+        this.bgMaskTime.delete(assetId);
+      },
+    );
     this.shaders = new ShaderRegistry(this.gl);
     this.quad = createQuad(this.gl);
     this.pingPong = new PingPong(this.gl);
@@ -96,6 +114,21 @@ export class Compositor {
 
   async renderFrame(project: Project, getAsset: (id: ID) => MediaAsset | undefined) {
     const gl = this.gl;
+    const assetIds = new Set<string>(project.mediaLibrary.map((asset) => asset.id));
+    this.retainedAssetIds = assetIds;
+    this.assetTextures.retain(assetIds);
+    this.bgMaskTextures.retain(assetIds);
+    this.sources.retain(assetIds);
+    const graphicClipIds = new Set<string>();
+    for (const track of project.timeline.tracks) {
+      for (const clip of track.clips) {
+        if (isTextClip(clip) || isShapeClip(clip)) graphicClipIds.add(clip.id);
+      }
+    }
+    this.textTextures.retain(graphicClipIds);
+    for (const id of this.decodePrepared) if (!assetIds.has(id)) this.decodePrepared.delete(id);
+    for (const id of this.decodeRetryAt.keys())
+      if (!assetIds.has(id)) this.decodeRetryAt.delete(id);
     getFrameProvider().retain(
       new Set(
         project.mediaLibrary.filter((asset) => asset.kind === "video").map((asset) => asset.id),
@@ -454,8 +487,12 @@ export class Compositor {
           try {
             const blob = await readMediaFile(asset.opfsPath);
             if (blob && (await provider.prepare(asset.id, blob))) {
-              this.decodePrepared.add(asset.id);
-              this.decodeRetryAt.delete(asset.id);
+              if (this.retainedAssetIds.has(asset.id)) {
+                this.decodePrepared.add(asset.id);
+                this.decodeRetryAt.delete(asset.id);
+              } else {
+                provider.forget(asset.id);
+              }
             } else {
               this.decodeRetryAt.set(asset.id, Date.now() + 1000);
             }
@@ -535,16 +572,15 @@ export class Compositor {
   // ----
 
   dispose() {
-    for (const tex of this.assetTextures.values()) this.gl.deleteTexture(tex);
     this.assetTextures.clear();
-    for (const tex of this.textTextures.values()) this.gl.deleteTexture(tex);
     this.textTextures.clear();
-    for (const tex of this.bgMaskTextures.values()) this.gl.deleteTexture(tex);
     this.bgMaskTextures.clear();
     this.bgMaskTime.clear();
     this.decodePrepared.clear();
     this.decodePreparing.clear();
     this.decodeRetryAt.clear();
+    this.retainedAssetIds.clear();
+    disposeLutTextures(this.gl);
     this.scratch.dispose();
     this.shaders.dispose();
     this.pingPong.dispose();
