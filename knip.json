@@ -4,7 +4,6 @@
     "apps/web": {
       "entry": [
         "src/app/**/{page,layout,loading,error,not-found,route}.tsx",
-        "src/app/**/{page,layout,loading,error,not-found,route}.ts",
         "next.config.{js,mjs,ts}",
         "scripts/e2e-collab-server.mjs",
         "src/**/*.test.{ts,tsx}",
@@ -12,20 +11,11 @@
         "public/plugins/*.js"
       ],
       "project": ["src/**/*.{ts,tsx}"],
-      "ignoreDependencies": [
-        "@vitejs/plugin-react",
-        "@huggingface/transformers",
-        "@mediapipe/tasks-vision",
-        "mp4box",
-        "y-protocols"
-      ],
       "ignore": [
-        "src/effects/plugin-registry.ts",
-        "public/plugins/*.js"
+        "src/effects/plugin-registry.ts"
       ]
     },
     "apps/desktop": {
-      "entry": ["src/main.cjs"],
       "project": ["src/**/*.cjs"],
       "ignore": [
         "src/preload.cjs"
@@ -35,7 +25,7 @@
       ]
     },
     "packages/core": {
-      "entry": ["src/index.ts", "src/**/*.test.ts"],
+      "entry": ["src/**/*.test.ts"],
       "project": ["src/**/*.ts"]
     }
   }

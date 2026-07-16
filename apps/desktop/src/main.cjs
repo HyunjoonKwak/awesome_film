@@ -8,7 +8,6 @@
 const { app, BrowserWindow, Menu, dialog, ipcMain, protocol, session, shell } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
-const { pathToFileURL } = require("node:url");
 
 const isDev = !!process.env.CUT_DEV_URL;
 const DEV_URL = process.env.CUT_DEV_URL ?? "http://localhost:3000/editor";
@@ -142,13 +141,31 @@ const createWindow = () => {
     win.loadURL("app://cut-editor/editor/");
   }
 
-  // External http(s) links open in the user's browser, not in-app.
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith("http://") || url.startsWith("https://")) {
-      shell.openExternal(url);
-      return { action: "deny" };
+  const isTrustedNavigation = (url) => {
+    try {
+      if (isDev) return new URL(url).origin === new URL(DEV_URL).origin;
+      const parsed = new URL(url);
+      return parsed.protocol === "app:" && parsed.hostname === "cut-editor";
+    } catch {
+      return false;
     }
-    return { action: "allow" };
+  };
+  const openExternal = (url) => {
+    if (url.startsWith("https://") || url.startsWith("http://")) {
+      void shell.openExternal(url);
+    }
+  };
+
+  // Popups never get an Electron renderer. Web links go to the system browser;
+  // file/custom schemes are denied.
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    openExternal(url);
+    return { action: "deny" };
+  });
+  win.webContents.on("will-navigate", (event, url) => {
+    if (isTrustedNavigation(url)) return;
+    event.preventDefault();
+    openExternal(url);
   });
 
   return win;
@@ -348,5 +365,3 @@ console.log("[cut-desktop] booting", {
   webOut: WEB_OUT,
   exists: fs.existsSync(WEB_OUT),
 });
-// Silence the unused-export warning for pathToFileURL when no callers reach it.
-void pathToFileURL;
