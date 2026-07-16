@@ -21,7 +21,8 @@ interface AwarenessState {
 
 const palette = ["#6366f1", "#ec4899", "#10b981", "#f59e0b", "#06b6d4", "#a855f7"];
 
-const randomFromPalette = () => palette[Math.floor(Math.random() * palette.length)]!;
+const randomFromPalette = () =>
+  palette[Math.floor(Math.random() * palette.length)] ?? "#6366f1";
 
 export const useAwarenessStore = create<AwarenessState>((set) => ({
   selfId:
