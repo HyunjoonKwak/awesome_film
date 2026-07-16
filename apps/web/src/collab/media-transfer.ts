@@ -8,6 +8,7 @@ const CHUNK_FIELD = "mediaChunk";
 const MEDIA_CHUNK_BYTES = 32 * 1024;
 const MAX_TRANSFER_BYTES = 50 * 1024 * 1024 * 1024;
 const MAX_ENCODED_CHUNK_LENGTH = Math.ceil(MEDIA_CHUNK_BYTES / 3) * 4 + 4;
+const DEFAULT_REQUEST_TIMEOUT_MS = 8_000;
 
 interface MediaRequest {
   readonly version: 1;
@@ -59,6 +60,7 @@ interface MediaTransferOptions {
   ) => void;
   readonly onError?: (message: string | null) => void;
   readonly createTransferId?: () => string;
+  readonly requestTimeoutMs?: number;
 }
 
 export interface MediaTransferManager {
@@ -148,14 +150,17 @@ export const createMediaTransferManager = ({
   onProgress = (progress) => useMediaTransferStore.getState().setProgress(progress),
   onError = (message) => useMediaTransferStore.getState().setError(message),
   createTransferId = defaultTransferId,
+  requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
 }: MediaTransferOptions): MediaTransferManager => {
   let disposed = false;
   let scanning = false;
   let scanAgain = false;
   let receiving = false;
+  let restarting = false;
   let serving = false;
   let incoming: IncomingTransfer | null = null;
   let failedAssetId: string | null = null;
+  let requestTimer: ReturnType<typeof setTimeout> | null = null;
 
   const localRequest = (): MediaRequest | null => {
     const value = awareness.getLocalState()?.[REQUEST_FIELD];
@@ -164,6 +169,12 @@ export const createMediaTransferManager = ({
 
   const findAsset = (assetId: string): MediaAsset | undefined =>
     getProject().mediaLibrary.find((asset) => asset.id === assetId);
+
+  const clearRequestTimer = (): void => {
+    if (requestTimer === null) return;
+    clearTimeout(requestTimer);
+    requestTimer = null;
+  };
 
   const abortIncoming = async (): Promise<void> => {
     const active = incoming;
@@ -180,10 +191,61 @@ export const createMediaTransferManager = ({
 
   const fail = async (assetId: string, error: unknown): Promise<void> => {
     failedAssetId = assetId;
+    clearRequestTimer();
     awareness.setLocalStateField(REQUEST_FIELD, null);
     await abortIncoming();
     onProgress(null);
     onError(error instanceof Error ? error.message : String(error));
+  };
+
+  const armRequestTimer = (request: MediaRequest): void => {
+    clearRequestTimer();
+    requestTimer = setTimeout(
+      () => {
+        requestTimer = null;
+        void restartRequest(request);
+      },
+      Math.max(1, requestTimeoutMs),
+    );
+  };
+
+  const restartRequest = async (expired: MediaRequest): Promise<void> => {
+    if (disposed || restarting) return;
+    const current = localRequest();
+    if (
+      !current ||
+      current.transferId !== expired.transferId ||
+      current.assetId !== expired.assetId ||
+      current.offset !== expired.offset
+    ) {
+      return;
+    }
+    if (receiving) {
+      armRequestTimer(current);
+      return;
+    }
+    restarting = true;
+    try {
+      await abortIncoming();
+      if (disposed) return;
+      const asset = findAsset(expired.assetId);
+      if (!asset || !isSafeMediaKey(asset.opfsPath)) {
+        awareness.setLocalStateField(REQUEST_FIELD, null);
+        queueMicrotask(() => void scanMissing());
+        return;
+      }
+      const replacement: MediaRequest = {
+        version: 1,
+        transferId: createTransferId(),
+        assetId: asset.id,
+        offset: 0,
+      };
+      onProgress({ assetId: asset.id, name: asset.name, receivedBytes: 0, totalBytes: 0 });
+      awareness.setLocalStateField(REQUEST_FIELD, replacement);
+      armRequestTimer(replacement);
+    } finally {
+      restarting = false;
+    }
   };
 
   const scanMissing = async (): Promise<void> => {
@@ -210,6 +272,7 @@ export const createMediaTransferManager = ({
         onError(null);
         onProgress({ assetId: asset.id, name: asset.name, receivedBytes: 0, totalBytes: 0 });
         awareness.setLocalStateField(REQUEST_FIELD, request);
+        armRequestTimer(request);
         return;
       }
       onProgress(null);
@@ -223,7 +286,7 @@ export const createMediaTransferManager = ({
   };
 
   const receiveChunk = async (): Promise<void> => {
-    if (disposed || receiving) return;
+    if (disposed || receiving || restarting) return;
     const request = localRequest();
     if (!request) return;
     const candidate = [...awareness.getStates().entries()]
@@ -240,6 +303,7 @@ export const createMediaTransferManager = ({
     if (!candidate) return;
 
     receiving = true;
+    clearRequestTimer();
     try {
       const asset = findAsset(request.assetId);
       if (!asset || !isSafeMediaKey(asset.opfsPath)) {
@@ -254,11 +318,15 @@ export const createMediaTransferManager = ({
         candidate.done !== (nextOffset === candidate.totalBytes) ||
         (!candidate.done && bytes.byteLength === 0)
       ) {
+        armRequestTimer(request);
         return;
       }
 
       if (!incoming) {
-        if (candidate.offset !== 0) return;
+        if (candidate.offset !== 0) {
+          armRequestTimer(request);
+          return;
+        }
         const releaseLease = storage.lease(asset.opfsPath);
         try {
           incoming = {
@@ -280,6 +348,7 @@ export const createMediaTransferManager = ({
         incoming.nextOffset !== candidate.offset ||
         incoming.totalBytes !== candidate.totalBytes
       ) {
+        armRequestTimer(request);
         return;
       }
 
@@ -297,11 +366,14 @@ export const createMediaTransferManager = ({
         await completed.writer.close();
         incoming = null;
         completed.releaseLease();
+        clearRequestTimer();
         awareness.setLocalStateField(REQUEST_FIELD, null);
         onProgress(null);
         queueMicrotask(() => void scanMissing());
       } else {
-        awareness.setLocalStateField(REQUEST_FIELD, { ...request, offset: nextOffset });
+        const nextRequest = { ...request, offset: nextOffset };
+        awareness.setLocalStateField(REQUEST_FIELD, nextRequest);
+        armRequestTimer(nextRequest);
       }
     } catch (error) {
       await fail(request.assetId, error);
@@ -387,11 +459,24 @@ export const createMediaTransferManager = ({
   return {
     scan: () => {
       if (failedAssetId && !findAsset(failedAssetId)) failedAssetId = null;
+      const request = localRequest();
+      const requestedAsset = request ? findAsset(request.assetId) : null;
+      if (
+        request &&
+        (!requestedAsset ||
+          (incoming !== null && incoming.asset.opfsPath !== requestedAsset.opfsPath))
+      ) {
+        clearRequestTimer();
+        awareness.setLocalStateField(REQUEST_FIELD, null);
+        void abortIncoming().then(() => scanMissing());
+        return;
+      }
       void scanMissing();
     },
     dispose: () => {
       if (disposed) return;
       disposed = true;
+      clearRequestTimer();
       awareness.off("change", awarenessChanged);
       awareness.setLocalStateField(REQUEST_FIELD, null);
       awareness.setLocalStateField(CHUNK_FIELD, null);

@@ -158,4 +158,51 @@ describe("media transfer protocol", () => {
     source.dispose();
     target.dispose();
   });
+
+  it("reissues an unanswered request instead of waiting forever", async () => {
+    const bus = new AwarenessBus();
+    const awareness = new FakeAwareness(1, bus);
+    let sequence = 0;
+    const manager = createMediaTransferManager({
+      awareness,
+      getProject: () => project,
+      storage: mapStorage(new Map()),
+      onProgress: () => {},
+      onError: () => {},
+      createTransferId: () => `transfer-${++sequence}`,
+      requestTimeoutMs: 5,
+    });
+
+    await waitFor(() => isMediaRequest(awareness.getLocalState().mediaRequest));
+    const first = awareness.getLocalState().mediaRequest;
+    expect(isMediaRequest(first)).toBe(true);
+    if (!isMediaRequest(first)) throw new Error("Initial media request is missing");
+    await waitFor(() => {
+      const current = awareness.getLocalState().mediaRequest;
+      return isMediaRequest(current) && current.transferId !== first.transferId;
+    });
+
+    manager.dispose();
+  });
+
+  it("cancels a pending request when its asset is removed", async () => {
+    const bus = new AwarenessBus();
+    const awareness = new FakeAwareness(1, bus);
+    let currentProject = project;
+    const manager = createMediaTransferManager({
+      awareness,
+      getProject: () => currentProject,
+      storage: mapStorage(new Map()),
+      onProgress: () => {},
+      onError: () => {},
+      requestTimeoutMs: 100,
+    });
+
+    await waitFor(() => isMediaRequest(awareness.getLocalState().mediaRequest));
+    currentProject = { ...project, mediaLibrary: [] };
+    manager.scan();
+    await waitFor(() => awareness.getLocalState().mediaRequest === null);
+
+    manager.dispose();
+  });
 });
