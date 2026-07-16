@@ -60,11 +60,15 @@ export function TopBar() {
           type="text"
           value={draftName}
           onChange={(e) => setDraftName(e.target.value)}
-          onBlur={() => {
-            if (draftName !== projectName) renameProject(draftName);
+          onBlur={(e) => {
+            // Read from the DOM event instead of the render-time draft. A
+            // paste/fill immediately followed by Enter can blur before React
+            // has committed the latest onChange state.
+            const name = e.currentTarget.value;
+            if (name !== projectName) renameProject(name);
           }}
           onKeyDown={(e) => {
-            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            if (e.key === "Enter") e.currentTarget.blur();
             if (e.key === "Escape") setDraftName(projectName);
           }}
           className="rounded bg-transparent px-1 text-sm font-medium text-ink-1 outline-none hover:bg-white/5 focus:bg-white/10"
