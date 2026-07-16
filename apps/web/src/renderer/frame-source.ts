@@ -1,9 +1,10 @@
-import type { MediaAsset } from "@cut/core";
-import { getMediaUrl } from "@/persistence/opfs";
 import { useProxyStore } from "@/media/proxy-store";
+import { type MediaUrlLease, acquireMediaUrl } from "@/persistence/opfs";
+import type { MediaAsset } from "@cut/core";
 import { BoundedResourceCache } from "./bounded-resource-cache";
 
 type Source = HTMLVideoElement | HTMLImageElement;
+const mediaUrlLeases = new WeakMap<Source, MediaUrlLease>();
 
 const releaseSource = (source: Source): void => {
   if (source instanceof HTMLVideoElement) {
@@ -13,6 +14,8 @@ const releaseSource = (source: Source): void => {
   } else {
     source.removeAttribute("src");
   }
+  mediaUrlLeases.get(source)?.release();
+  mediaUrlLeases.delete(source);
 };
 
 // Bounded fallback element cache. WebCodecs handles frame-accurate video
@@ -71,20 +74,20 @@ export class FrameSourcePool {
   private async load(asset: MediaAsset): Promise<Source | null> {
     // Use the low-res proxy for preview/scrub when enabled and available.
     const useProxy = useProxyStore.getState().useProxy;
-    const proxyUrl = useProxy && asset.proxyPath ? await getMediaUrl(asset.proxyPath) : null;
-    const url = proxyUrl ?? (await getMediaUrl(asset.opfsPath));
-    if (!url) return null;
+    const proxyLease = useProxy && asset.proxyPath ? await acquireMediaUrl(asset.proxyPath) : null;
+    const lease = proxyLease ?? (await acquireMediaUrl(asset.opfsPath));
+    if (!lease) return null;
+    let source: Source | null = null;
     if (asset.kind === "image") {
-      return await new Promise<Source | null>((resolve) => {
+      source = await new Promise<Source | null>((resolve) => {
         const img = new Image();
         img.crossOrigin = "anonymous";
         img.onload = () => resolve(img);
         img.onerror = () => resolve(null);
-        img.src = url;
+        img.src = lease.url;
       });
-    }
-    if (asset.kind === "video") {
-      return await new Promise<Source | null>((resolve) => {
+    } else if (asset.kind === "video") {
+      source = await new Promise<Source | null>((resolve) => {
         const v = document.createElement("video");
         v.crossOrigin = "anonymous";
         v.preload = "auto";
@@ -92,10 +95,15 @@ export class FrameSourcePool {
         v.playsInline = true;
         v.onloadeddata = () => resolve(v);
         v.onerror = () => resolve(null);
-        v.src = url;
+        v.src = lease.url;
       });
     }
-    return null; // audio handled elsewhere
+    if (!source) {
+      lease.release();
+      return null;
+    }
+    mediaUrlLeases.set(source, lease);
+    return source;
   }
 
   dispose() {

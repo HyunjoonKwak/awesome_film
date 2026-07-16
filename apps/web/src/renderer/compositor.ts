@@ -397,7 +397,16 @@ export class Compositor {
         const [, dst] = this.pingPong.current();
         gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
         gl.viewport(0, 0, w, h);
-        const prog = this.shaders.get(pass.shader);
+        let prog: ReturnType<ShaderRegistry["get"]>;
+        try {
+          prog = this.shaders.get(pass.shader);
+        } catch {
+          // A plugin shader that failed to compile/link (or is missing)
+          // degrades this one effect to a no-op instead of throwing out of the
+          // whole chain and dropping the entire composited frame — mirrors the
+          // LUT guard above.
+          break;
+        }
         prog.use();
 
         gl.activeTexture(gl.TEXTURE0);

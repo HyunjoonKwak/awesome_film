@@ -1,19 +1,19 @@
 "use client";
 
-import { useRef, useState } from "react";
+import type { MessageKey } from "@/i18n/messages";
+import { useT } from "@/i18n/use-t";
+import { useProjectStore } from "@/stores/project-store";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Activity, Download, Loader2, X } from "lucide-react";
-import { PRESETS } from "./presets";
-import { WebCodecsExporter, downloadBlob } from "./exporter";
-import { mixProjectAudio } from "./audio-mixer";
-import { measureLoudness, type LoudnessResult } from "./loudness";
-import type { ExportProgress } from "./types";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { useProjectStore } from "@/stores/project-store";
+import { ProjectAudioMixer } from "./audio-mixer";
 import { useDuckingStore } from "./ducking-store";
+import { WebCodecsExporter, downloadBlob } from "./exporter";
+import { LoudnessMeter, type LoudnessResult } from "./loudness";
 import { useNormalizeStore } from "./normalize-store";
-import { useT } from "@/i18n/use-t";
-import type { MessageKey } from "@/i18n/messages";
+import { PRESETS } from "./presets";
+import type { ExportProgress } from "./types";
 
 interface Props {
   open: boolean;
@@ -37,9 +37,7 @@ const formatEta = (seconds: number): string => {
 export function ExportDialog({ open, onOpenChange }: Props) {
   const projectId = useProjectStore((s) => s.project.id);
   const projectName = useProjectStore((s) => s.project.name);
-  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(
-    new Set([PRESETS[0]!.id]),
-  );
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set([PRESETS[0]!.id]));
   const [progress, setProgress] = useState<ExportProgress | null>(null);
   const [queueLabel, setQueueLabel] = useState("");
   const [running, setRunning] = useState(false);
@@ -100,12 +98,24 @@ export function ExportDialog({ open, onOpenChange }: Props) {
     try {
       const project = useProjectStore.getState().project;
       const assets = new Map(project.mediaLibrary.map((a) => [a.id, a]));
-      const mixed = await mixProjectAudio(project, (id) => assets.get(id));
-      if (!mixed) {
-        toast.error(t("loudness.noAudio"));
-        return;
+      const duck = useDuckingStore.getState();
+      const mixer = new ProjectAudioMixer(project, (id) => assets.get(id), {
+        enabled: duck.enabled,
+        amountDb: duck.amountDb,
+        thresholdDb: duck.thresholdDb,
+      });
+      try {
+        const meter = new LoudnessMeter(mixer.sampleRate, 2);
+        for await (const chunk of mixer.chunks()) meter.push(chunk.channels);
+        const result = meter.result();
+        if (!Number.isFinite(result.integratedLufs) && !Number.isFinite(result.peakDbfs)) {
+          toast.error(t("loudness.noAudio"));
+          return;
+        }
+        setLoudness(result);
+      } finally {
+        mixer.dispose();
       }
-      setLoudness(measureLoudness(mixed.channels, mixed.sampleRate));
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
       toast.error(t("export.failed", { msg }));
@@ -149,8 +159,8 @@ export function ExportDialog({ open, onOpenChange }: Props) {
                   <span>
                     <span className="block font-medium text-ink-1">{p.name}</span>
                     <span className="block text-2xs text-ink-3">
-                      {p.width}×{p.height} • {p.fps} fps • {p.videoCodec}/
-                      {p.audioCodec} • {p.videoBitrateKbps} kbps
+                      {p.width}×{p.height} • {p.fps} fps • {p.videoCodec}/{p.audioCodec} •{" "}
+                      {p.videoBitrateKbps} kbps
                     </span>
                   </span>
                   <input
@@ -191,9 +201,15 @@ export function ExportDialog({ open, onOpenChange }: Props) {
               disabled={!normEnabled}
               className="rounded bg-white/5 px-2 py-1 text-2xs text-ink-1 outline-none disabled:opacity-40"
             >
-              <option value={-14} className="bg-panel-2">-14 LUFS (web)</option>
-              <option value={-16} className="bg-panel-2">-16 LUFS</option>
-              <option value={-23} className="bg-panel-2">-23 LUFS (broadcast)</option>
+              <option value={-14} className="bg-panel-2">
+                -14 LUFS (web)
+              </option>
+              <option value={-16} className="bg-panel-2">
+                -16 LUFS
+              </option>
+              <option value={-23} className="bg-panel-2">
+                -23 LUFS (broadcast)
+              </option>
             </select>
           </div>
 
@@ -206,7 +222,11 @@ export function ExportDialog({ open, onOpenChange }: Props) {
                 disabled={measuring}
                 className="flex items-center gap-1 rounded px-2 py-0.5 text-2xs text-ink-3 hover:bg-white/10 hover:text-ink-1 disabled:opacity-50"
               >
-                {measuring ? <Loader2 className="size-3 animate-spin" /> : <Activity className="size-3" />}
+                {measuring ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Activity className="size-3" />
+                )}
                 {measuring ? t("loudness.measuring") : t("loudness.measure")}
               </button>
             </div>
@@ -226,9 +246,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 
           {progress && (
             <div className="mt-4 space-y-1">
-              {queueLabel && (
-                <div className="text-2xs font-medium text-ink-2">{queueLabel}</div>
-              )}
+              {queueLabel && <div className="text-2xs font-medium text-ink-2">{queueLabel}</div>}
               <div className="flex justify-between text-2xs text-ink-3">
                 <span>{t(STAGE_KEY[progress.stage])}</span>
                 <span>
@@ -237,9 +255,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
                     <span className="ml-2 font-mono">{progress.fps.toFixed(1)} fps</span>
                   )}
                   {progress.etaSeconds !== undefined && progress.etaSeconds > 1 && (
-                    <span className="ml-2 font-mono">
-                      ETA {formatEta(progress.etaSeconds)}
-                    </span>
+                    <span className="ml-2 font-mono">ETA {formatEta(progress.etaSeconds)}</span>
                   )}
                 </span>
               </div>
@@ -264,12 +280,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
                 </button>
               </Dialog.Close>
             )}
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={handleExport}
-              disabled={running}
-            >
+            <button type="button" className="btn-primary" onClick={handleExport} disabled={running}>
               {running ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (

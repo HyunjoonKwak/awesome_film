@@ -1,12 +1,12 @@
-import { type Project, msToFrames, framesToMs } from "@cut/core";
-import { Muxer, ArrayBufferTarget } from "mp4-muxer";
 import { Compositor } from "@/renderer/compositor";
-import { mixProjectAudio, packStereoPlanar } from "./audio-mixer";
-import { useDuckingStore } from "./ducking-store";
-import { useNormalizeStore } from "./normalize-store";
-import { measureLoudness } from "./loudness";
 import { useRangeStore } from "@/stores/range-store";
-import type { Exporter, ExportPreset, ExportProgress, ExportRequest, ExportResult } from "./types";
+import { type Project, framesToMs, msToFrames } from "@cut/core";
+import { ArrayBufferTarget, Muxer } from "mp4-muxer";
+import { ProjectAudioMixer, packStereoPlanar } from "./audio-mixer";
+import { useDuckingStore } from "./ducking-store";
+import { LoudnessMeter } from "./loudness";
+import { useNormalizeStore } from "./normalize-store";
+import type { ExportPreset, ExportProgress, ExportRequest, ExportResult, Exporter } from "./types";
 
 const isWebCodecsSupported = (): boolean =>
   typeof window !== "undefined" && "VideoEncoder" in window && "VideoDecoder" in window;
@@ -16,8 +16,10 @@ const isWebCodecsSupported = (): boolean =>
 // and muxes both into an MP4 (H.264 + AAC) or WebM.
 export class WebCodecsExporter implements Exporter {
   private cancelled = false;
+  private abortController: AbortController | null = null;
   cancel(): void {
     this.cancelled = true;
+    this.abortController?.abort();
   }
 
   async start(req: ExportRequest, onProgress: (p: ExportProgress) => void): Promise<ExportResult> {
@@ -27,6 +29,9 @@ export class WebCodecsExporter implements Exporter {
           "Try the latest Chrome or Edge, or Safari 17+.",
       );
     }
+    this.cancelled = false;
+    const abortController = new AbortController();
+    this.abortController = abortController;
 
     const { project, getAsset } = await this.resolveProject(req.projectId);
     const preset = req.preset;
@@ -43,172 +48,187 @@ export class WebCodecsExporter implements Exporter {
     canvas.width = preset.width;
     canvas.height = preset.height;
     const compositor = new Compositor(canvas);
-    compositor.resize(preset.width, preset.height);
-    let virtualPlayheadMs = 0;
-    compositor.setPlayheadGetter(() => virtualPlayheadMs);
+    let encoder: VideoEncoder | null = null;
+    try {
+      compositor.resize(preset.width, preset.height);
+      let virtualPlayheadMs = 0;
+      compositor.setPlayheadGetter(() => virtualPlayheadMs);
 
-    const includeAudio =
-      preset.container === "mp4" &&
-      preset.audioCodec === "aac" &&
-      typeof AudioEncoder !== "undefined";
+      // Include audio only when the preset wants AAC AND the browser can encode
+      // it. A browser without AudioEncoder (e.g. older Safari) degrades to a
+      // video-only export instead of failing the whole render.
+      const includeAudio =
+        preset.container === "mp4" &&
+        preset.audioCodec === "aac" &&
+        typeof AudioEncoder !== "undefined";
 
-    const muxer = new Muxer({
-      target: new ArrayBufferTarget(),
-      video: {
-        codec: codecForMuxer(preset.videoCodec),
+      const muxer = new Muxer({
+        target: new ArrayBufferTarget(),
+        video: {
+          codec: codecForMuxer(preset.videoCodec),
+          width: preset.width,
+          height: preset.height,
+          frameRate: preset.fps,
+        },
+        ...(includeAudio
+          ? { audio: { codec: "aac", numberOfChannels: 2, sampleRate: 48_000 } }
+          : {}),
+        fastStart: "in-memory",
+        firstTimestampBehavior: "offset",
+      });
+
+      encoder = new VideoEncoder({
+        output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+        error: (e) => {
+          // biome-ignore lint/suspicious/noConsole: WebCodecs reports encoder failures via callbacks.
+          console.error("Encoder error:", e);
+        },
+      });
+      encoder.configure({
+        codec: codecForEncoder(preset.videoCodec, preset.width, preset.height),
         width: preset.width,
         height: preset.height,
-        frameRate: preset.fps,
-      },
-      ...(includeAudio ? { audio: { codec: "aac", numberOfChannels: 2, sampleRate: 48_000 } } : {}),
-      fastStart: "in-memory",
-      firstTimestampBehavior: "offset",
-    });
-
-    const encoder = new VideoEncoder({
-      output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
-      error: (e) => {
-        // biome-ignore lint/suspicious/noConsole: WebCodecs reports encoder failures via callbacks.
-        console.error("Encoder error:", e);
-      },
-    });
-    encoder.configure({
-      codec: codecForEncoder(preset.videoCodec, preset.width, preset.height),
-      width: preset.width,
-      height: preset.height,
-      bitrate: preset.videoBitrateKbps * 1000,
-      framerate: preset.fps,
-    });
-
-    onProgress({ stage: "rendering", progress: 0 });
-    const renderStartedAt = performance.now();
-
-    for (let f = 0; f < totalFrames; f++) {
-      if (this.cancelled) {
-        encoder.close();
-        compositor.dispose();
-        throw new Error("Export cancelled");
-      }
-      virtualPlayheadMs = rangeStart + framesToMs(f, preset.fps);
-      // renderFrame keys off project.timeline.playhead for visibility, keyframes
-      // and transitions, so advance it per frame (immutably) for the export.
-      const frameProject = {
-        ...project,
-        timeline: { ...project.timeline, playhead: virtualPlayheadMs },
-      };
-      await compositor.renderFrame(frameProject, getAsset);
-      const frame = new VideoFrame(canvas, {
-        timestamp: Math.round((f * 1_000_000) / preset.fps),
-        duration: Math.round(1_000_000 / preset.fps),
+        bitrate: preset.videoBitrateKbps * 1000,
+        framerate: preset.fps,
       });
-      try {
-        encoder.encode(frame, { keyFrame: f % 60 === 0 });
-      } finally {
-        frame.close();
-      }
-      if (f % 5 === 0) {
-        const elapsedSec = (performance.now() - renderStartedAt) / 1000;
-        const realisedFps = f / Math.max(0.01, elapsedSec);
-        const remainingSec = (totalFrames - f) / Math.max(0.5, realisedFps);
-        onProgress({
-          stage: "rendering",
-          progress: f / totalFrames,
-          fps: realisedFps,
-          etaSeconds: remainingSec,
-        });
-      }
-    }
 
-    if (includeAudio) {
-      try {
+      onProgress({ stage: "rendering", progress: 0 });
+      const renderStartedAt = performance.now();
+
+      for (let f = 0; f < totalFrames; f++) {
+        if (this.cancelled) {
+          throw new Error("Export cancelled");
+        }
+        virtualPlayheadMs = rangeStart + framesToMs(f, preset.fps);
+        // renderFrame keys off project.timeline.playhead for visibility, keyframes
+        // and transitions, so advance it per frame (immutably) for the export.
+        const frameProject = {
+          ...project,
+          timeline: { ...project.timeline, playhead: virtualPlayheadMs },
+        };
+        await compositor.renderFrame(frameProject, getAsset);
+        const frame = new VideoFrame(canvas, {
+          timestamp: Math.round((f * 1_000_000) / preset.fps),
+          duration: Math.round(1_000_000 / preset.fps),
+        });
+        try {
+          encoder.encode(frame, { keyFrame: f % 60 === 0 });
+        } finally {
+          frame.close();
+        }
+        if (f % 5 === 0) {
+          const elapsedSec = (performance.now() - renderStartedAt) / 1000;
+          const realisedFps = f / Math.max(0.01, elapsedSec);
+          const remainingSec = (totalFrames - f) / Math.max(0.5, realisedFps);
+          onProgress({
+            stage: "rendering",
+            progress: f / totalFrames,
+            fps: realisedFps,
+            etaSeconds: remainingSec,
+          });
+        }
+      }
+
+      if (includeAudio) {
         const duck = useDuckingStore.getState();
-        const mixed = await mixProjectAudio(project, getAsset, {
+        const mixer = new ProjectAudioMixer(project, getAsset, {
           enabled: duck.enabled,
           amountDb: duck.amountDb,
           thresholdDb: duck.thresholdDb,
         });
-        if (mixed && mixed.channels[0].length > 0) {
-          // Clip the mix to the export work area when one is set.
-          if (range.inMs !== null || range.outMs !== null) {
-            const from = Math.floor((rangeStart / 1000) * mixed.sampleRate);
-            const to = Math.floor((rangeEnd / 1000) * mixed.sampleRate);
-            for (let channel = 0; channel < 2; channel++) {
-              const pcm = mixed.channels[channel]!;
-              mixed.channels[channel] = pcm.slice(Math.max(0, from), Math.min(pcm.length, to));
+        try {
+          const mixOptions = {
+            startMs: rangeStart,
+            endMs: rangeEnd,
+            signal: abortController.signal,
+          } as const;
+          const normalize = useNormalizeStore.getState();
+          let masterGain = 1;
+          if (normalize.enabled) {
+            const meter = new LoudnessMeter(mixer.sampleRate, 2);
+            for await (const chunk of mixer.chunks(mixOptions)) meter.push(chunk.channels);
+            const { integratedLufs } = meter.result();
+            if (Number.isFinite(integratedLufs)) {
+              masterGain = 10 ** ((normalize.targetLufs - integratedLufs) / 20);
+              if (Math.abs(masterGain - 1) <= 0.01) masterGain = 1;
             }
           }
-          // Loudness normalization: bring integrated LUFS to the target with a
-          // single master gain (skip if already silent or on-target).
-          const norm = useNormalizeStore.getState();
-          if (norm.enabled) {
-            const { integratedLufs } = measureLoudness(mixed.channels, mixed.sampleRate);
-            if (Number.isFinite(integratedLufs)) {
-              const gain = 10 ** ((norm.targetLufs - integratedLufs) / 20);
-              if (Math.abs(gain - 1) > 0.01) {
-                for (const channel of mixed.channels) {
-                  for (let i = 0; i < channel.length; i++) {
-                    channel[i] = Math.max(-1, Math.min(1, channel[i]! * gain));
+
+          const audioEncoder = new AudioEncoder({
+            output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+            error: (error) => {
+              // biome-ignore lint/suspicious/noConsole: WebCodecs reports encoder failures via callbacks.
+              console.warn("Audio encoder error:", error);
+            },
+          });
+          try {
+            audioEncoder.configure({
+              codec: "mp4a.40.2",
+              sampleRate: mixer.sampleRate,
+              numberOfChannels: 2,
+              bitrate: preset.audioBitrateKbps * 1000,
+            });
+            const encoderChunkSize = 1024;
+            for await (const chunk of mixer.chunks(mixOptions)) {
+              const totalSamples = Math.min(chunk.channels[0].length, chunk.channels[1].length);
+              for (let i = 0; i < totalSamples; i += encoderChunkSize) {
+                if (this.cancelled) throw new Error("Export cancelled");
+                const numberOfFrames = Math.min(encoderChunkSize, totalSamples - i);
+                const planar = packStereoPlanar(chunk.channels, i, numberOfFrames);
+                if (masterGain !== 1) {
+                  for (let sample = 0; sample < planar.length; sample++) {
+                    planar[sample] = Math.max(-1, Math.min(1, planar[sample]! * masterGain));
                   }
+                }
+                const data = new AudioData({
+                  format: "f32-planar",
+                  sampleRate: chunk.sampleRate,
+                  numberOfFrames,
+                  numberOfChannels: 2,
+                  timestamp: Math.round(((chunk.startSample + i) / chunk.sampleRate) * 1_000_000),
+                  data: planar,
+                });
+                try {
+                  audioEncoder.encode(data);
+                } finally {
+                  data.close();
                 }
               }
             }
+            await audioEncoder.flush();
+          } finally {
+            if (audioEncoder.state !== "closed") audioEncoder.close();
           }
-          const audioEncoder = new AudioEncoder({
-            output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
-            error: (e) => {
-              // biome-ignore lint/suspicious/noConsole: WebCodecs reports encoder failures via callbacks.
-              console.warn("Audio encoder error:", e);
-            },
-          });
-          audioEncoder.configure({
-            codec: "mp4a.40.2",
-            sampleRate: mixed.sampleRate,
-            numberOfChannels: 2,
-            bitrate: preset.audioBitrateKbps * 1000,
-          });
-          const CHUNK = 1024;
-          const totalSamples = Math.min(mixed.channels[0].length, mixed.channels[1].length);
-          for (let i = 0; i < totalSamples; i += CHUNK) {
-            const numberOfFrames = Math.min(CHUNK, totalSamples - i);
-            const planar = packStereoPlanar(mixed.channels, i, numberOfFrames);
-            const data = new AudioData({
-              format: "f32-planar",
-              sampleRate: mixed.sampleRate,
-              numberOfFrames,
-              numberOfChannels: 2,
-              timestamp: Math.round((i / mixed.sampleRate) * 1_000_000),
-              data: planar,
-            });
-            try {
-              audioEncoder.encode(data);
-            } finally {
-              data.close();
-            }
+        } catch (err) {
+          if (this.cancelled || abortController.signal.aborted) {
+            throw new Error("Export cancelled", { cause: err });
           }
-          await audioEncoder.flush();
-          audioEncoder.close();
+          const message = err instanceof Error ? err.message : String(err);
+          throw new Error(`Audio export failed: ${message}`, { cause: err });
+        } finally {
+          mixer.dispose();
         }
-      } catch (err) {
-        // biome-ignore lint/suspicious/noConsole: Export continues without audio and needs a diagnostic.
-        console.warn("Audio export skipped:", err);
       }
+
+      if (this.cancelled) throw new Error("Export cancelled");
+      onProgress({ stage: "muxing", progress: 0.95 });
+      await encoder.flush();
+      muxer.finalize();
+
+      const { buffer } = muxer.target;
+      onProgress({ stage: "finalizing", progress: 1 });
+
+      const name = sanitizeName(project.name) || "export";
+      return {
+        blob: new Blob([buffer], { type: "video/mp4" }),
+        mime: "video/mp4",
+        suggestedName: `${name}.mp4`,
+      };
+    } finally {
+      if (this.abortController === abortController) this.abortController = null;
+      if (encoder?.state !== "closed") encoder?.close();
+      compositor.dispose();
     }
-
-    onProgress({ stage: "muxing", progress: 0.95 });
-    await encoder.flush();
-    muxer.finalize();
-    encoder.close();
-    compositor.dispose();
-
-    const { buffer } = muxer.target;
-    onProgress({ stage: "finalizing", progress: 1 });
-
-    const name = sanitizeName(project.name) || "export";
-    return {
-      blob: new Blob([buffer], { type: "video/mp4" }),
-      mime: "video/mp4",
-      suggestedName: `${name}.mp4`,
-    };
   }
 
   private async resolveProject(_projectId: string): Promise<{

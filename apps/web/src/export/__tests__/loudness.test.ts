@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { measureLoudness } from "../loudness";
+import { LoudnessMeter, measureLoudness } from "../loudness";
 
 // Generates `seconds` of a sine tone at the given amplitude and frequency.
 const sine = (amp: number, freq: number, seconds: number, sr = 48_000): Float32Array => {
@@ -39,5 +39,19 @@ describe("measureLoudness", () => {
 
     expect(Number.isFinite(stereo.integratedLufs)).toBe(true);
     expect(stereo.integratedLufs - mono.integratedLufs).toBeCloseTo(3.01, 1);
+  });
+
+  it("matches a whole-buffer measurement when PCM arrives in chunks", () => {
+    const left = sine(0.3, 440, 3);
+    const right = sine(0.2, 880, 3);
+    const whole = measureLoudness([left, right], 48_000);
+    const meter = new LoudnessMeter(48_000, 2);
+    for (let from = 0; from < left.length; from += 7777) {
+      meter.push([left.subarray(from, from + 7777), right.subarray(from, from + 7777)]);
+    }
+    const streamed = meter.result();
+
+    expect(streamed.integratedLufs).toBeCloseTo(whole.integratedLufs, 5);
+    expect(streamed.peakDbfs).toBeCloseTo(whole.peakDbfs, 5);
   });
 });

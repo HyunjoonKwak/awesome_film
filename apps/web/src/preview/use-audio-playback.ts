@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
 import { usePlaybackStore } from "@/stores/playback-store";
 import { useProjectStore } from "@/stores/project-store";
+import { useEffect } from "react";
 import { getAudioEngine } from "./audio-engine";
 
 // Bridges the playback store to the audio engine: start monitoring from the
@@ -46,11 +46,16 @@ export function useAudioPlayback(): void {
         }
       },
     );
+    const offMedia = useProjectStore.subscribe(
+      (state) => state.project.mediaLibrary,
+      (mediaLibrary) => engine.retain(new Set(mediaLibrary.map((asset) => asset.id))),
+    );
 
     if (usePlaybackStore.getState().playing) start();
     return () => {
       offPlayback();
       offPlayhead();
+      offMedia();
       engine.stop();
     };
   }, []);

@@ -10,7 +10,7 @@ const isWebCodecsAvailable = (): boolean =>
 
 // A cached frame is only trusted if it's within this window of the requested
 // time. Beyond it we return null so the compositor seeks a real <video>
-// instead of showing a far-off cached frame (the cache is a small global LRU).
+// instead of showing a far-off cached frame (the cache is a small per-asset LRU).
 const FRAME_TOLERANCE_US = 100_000; // 100ms
 
 export interface FrameProvider {

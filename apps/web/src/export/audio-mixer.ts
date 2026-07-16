@@ -1,7 +1,13 @@
 import { readMediaFile } from "@/persistence/opfs";
 import type { ID, MediaAsset, Project } from "@cut/core";
-import { type EffectInstance, type MediaClip, isMediaClip, sampleKeyframeTrack } from "@cut/core";
-import { combineInline } from "./audio-mixer-worker";
+import {
+  type EffectInstance,
+  type MediaClip,
+  isMediaClip,
+  sampleKeyframeTrack,
+  sourceOffsetForRamp,
+} from "@cut/core";
+import { combineInlineStateful } from "./audio-mixer-worker";
 import { denoise } from "./spectral-denoise";
 
 const dbToGain = (db: number): number => 10 ** (db / 20);
@@ -15,15 +21,34 @@ export const resampleClipAudio = (
   outputSampleRate: number,
   clip: MediaClip,
 ): Float32Array => {
-  const output = new Float32Array(Math.floor((clip.duration / 1000) * outputSampleRate));
+  return resampleClipAudioRange(
+    source,
+    sourceSampleRate,
+    outputSampleRate,
+    clip,
+    0,
+    Math.floor((clip.duration / 1000) * outputSampleRate),
+  );
+};
+
+const resampleClipAudioRange = (
+  source: Float32Array,
+  sourceSampleRate: number,
+  outputSampleRate: number,
+  clip: MediaClip,
+  clipOffsetMs: number,
+  outputSamples: number,
+): Float32Array => {
+  const output = new Float32Array(outputSamples);
   const speedTrack = clip.keyframes.find((track) => track.target === "speed");
-  let sourceCursor = (clip.trimIn / 1000) * sourceSampleRate;
+  let sourceCursor =
+    ((clip.trimIn + sourceOffsetForRamp(clip, clipOffsetMs)) / 1000) * sourceSampleRate;
 
   for (let i = 0; i < output.length; i++) {
     const sourceIndex = Math.floor(sourceCursor);
     if (sourceIndex >= 0 && sourceIndex < source.length) output[i] = source[sourceIndex] ?? 0;
 
-    const relMs = (i / outputSampleRate) * 1000;
+    const relMs = clipOffsetMs + (i / outputSampleRate) * 1000;
     const instantaneousRate = speedTrack
       ? Math.max(0.05, sampleKeyframeTrack(speedTrack, relMs) ?? clip.speed)
       : clip.speed;
@@ -82,6 +107,8 @@ const applyAudioEffects = async (
   pcm: Float32Array,
   effects: readonly EffectInstance[],
   sampleRate: number,
+  clipOffsetMs: number,
+  clipDurationMs: number,
 ): Promise<Float32Array> => {
   let buf = pcm;
   for (const fx of effects) {
@@ -99,15 +126,12 @@ const applyAudioEffects = async (
         const outMs = Number(fx.params.fadeOutMs ?? 0);
         if (inMs === 0 && outMs === 0) break;
         buf = buf.slice();
-        const inSamples = Math.floor((inMs / 1000) * sampleRate);
-        const outSamples = Math.floor((outMs / 1000) * sampleRate);
-        for (let i = 0; i < inSamples && i < buf.length; i++) {
-          buf[i]! *= i / Math.max(1, inSamples);
-        }
-        for (let i = 0; i < outSamples && i < buf.length; i++) {
-          const idx = buf.length - 1 - i;
-          if (idx < 0) break;
-          buf[idx]! *= i / Math.max(1, outSamples);
+        for (let i = 0; i < buf.length; i++) {
+          const relMs = clipOffsetMs + (i / sampleRate) * 1000;
+          const fadeIn = inMs > 0 ? Math.min(1, Math.max(0, relMs / inMs)) : 1;
+          const remainingMs = Math.max(0, clipDurationMs - relMs);
+          const fadeOut = outMs > 0 ? Math.min(1, remainingMs / outMs) : 1;
+          buf[i]! *= Math.min(fadeIn, fadeOut);
         }
         break;
       }
@@ -199,114 +223,206 @@ export const packStereoPlanar = (
   return planar;
 };
 
-// Sums all audio clips into a stereo PCM stream at 48 kHz, applying each
-// clip's audio effects. With ducking on, audio-track clips (music) are
-// attenuated wherever video-track audio (voice) exceeds the threshold.
-export const mixProjectAudio = async (
-  project: Project,
-  getAsset: (id: ID) => MediaAsset | undefined,
-  ducking?: DuckingOptions,
-): Promise<{ channels: StereoChannels; sampleRate: number } | null> => {
-  const sampleRate = 48_000;
-  const totalSamples = Math.ceil((project.timeline.duration / 1000) * sampleRate);
-  if (totalSamples <= 0) return null;
-  const voiceChannels: StereoChannels = [
-    new Float32Array(totalSamples),
-    new Float32Array(totalSamples),
-  ];
-  const musicChannels: StereoChannels = [
-    new Float32Array(totalSamples),
-    new Float32Array(totalSamples),
-  ];
-  const ctx = new OfflineAudioContext(1, totalSamples, sampleRate);
+export interface AudioMixChunk {
+  readonly channels: StereoChannels;
+  readonly sampleRate: number;
+  readonly startSample: number;
+}
 
-  // Which bus a clip belongs to, by its track kind.
-  const trackKindOfClip = new Map<string, "video" | "audio" | "other">();
-  for (const t of project.timeline.tracks) {
-    if (t.muted) continue;
-    for (const c of t.clips) {
-      trackKindOfClip.set(
-        c.id,
-        t.kind === "audio" ? "audio" : t.kind === "video" ? "video" : "other",
-      );
-    }
+export interface AudioMixOptions {
+  readonly startMs?: number;
+  readonly endMs?: number;
+  readonly chunkDurationMs?: number;
+  readonly signal?: AbortSignal;
+}
+
+interface PreparedClip {
+  readonly clip: MediaClip;
+  readonly bus: "voice" | "music";
+}
+
+const throwIfAborted = (signal?: AbortSignal): void => {
+  if (signal?.aborted) throw new DOMException("Audio mixing cancelled", "AbortError");
+};
+
+// Chunked project mixer. Only four bus chunks plus two output chunks are ever
+// allocated, independent of timeline duration. Decoded source assets use a
+// small LRU because decodeAudioData itself is whole-file; this bounds retained
+// source memory while avoiding a decode of every project asset up front.
+export class ProjectAudioMixer {
+  readonly sampleRate = 48_000;
+  private static readonly DEFAULT_CHUNK_MS = 30_000;
+  private static readonly EFFECT_PADDING_MS = 500;
+  private static readonly MAX_DECODED_ASSETS = 2;
+  private readonly clips: PreparedClip[];
+  private readonly buffers = new Map<string, AudioBuffer | null>();
+  private decodeContext: OfflineAudioContext | null = null;
+
+  constructor(
+    private readonly project: Project,
+    private readonly getAsset: (id: ID) => MediaAsset | undefined,
+    private readonly ducking?: DuckingOptions,
+  ) {
+    const soloing = project.timeline.tracks.some((track) => track.solo);
+    this.clips = project.timeline.tracks.flatMap((track) => {
+      if (track.muted || (soloing && !track.solo)) return [];
+      const bus = track.kind === "audio" ? "music" : "voice";
+      return track.clips
+        .filter((clip): clip is MediaClip => isMediaClip(clip) && !clip.disabled)
+        .map((clip) => ({ clip, bus }));
+    });
   }
 
-  const buffers = new Map<string, AudioBuffer>();
-  // Solo wins over mute: if any track is soloed, only soloed tracks are heard.
-  const soloing = project.timeline.tracks.some((t) => t.solo);
-  const audioClips = project.timeline.tracks
-    .flatMap((t) => (t.muted || (soloing && !t.solo) ? [] : t.clips))
-    .filter((c) => isMediaClip(c) && !c.disabled);
-
-  for (const clip of audioClips) {
-    if (!isMediaClip(clip)) continue;
-    const asset = getAsset(clip.assetId);
-    if (!asset || (asset.kind !== "video" && asset.kind !== "audio")) continue;
-    if (!buffers.has(asset.id)) {
-      const blob = await readMediaFile(asset.opfsPath);
-      if (!blob) continue;
-      try {
-        const decoded = await ctx.decodeAudioData(await blob.arrayBuffer());
-        buffers.set(asset.id, decoded);
-      } catch {
-        // Skip assets that fail to decode.
-      }
-    }
-  }
-
-  for (const clip of audioClips) {
-    if (!isMediaClip(clip)) continue;
-    const buf = buffers.get(clip.assetId);
-    if (!buf) continue;
-    const startSample = Math.floor((clip.start / 1000) * sampleRate);
-    const [leftSource, rightSource] = decodedStereoChannels(buf);
-    const processed = await Promise.all(
-      [leftSource, rightSource].map((source) =>
-        applyAudioEffects(
-          resampleClipAudio(source, buf.sampleRate, sampleRate, clip),
-          clip.effects,
-          sampleRate,
-        ),
+  async *chunks(options: AudioMixOptions = {}): AsyncGenerator<AudioMixChunk> {
+    const rangeStartMs = Math.max(0, options.startMs ?? 0);
+    const rangeEndMs = Math.max(
+      rangeStartMs,
+      Math.min(this.project.timeline.duration, options.endMs ?? this.project.timeline.duration),
+    );
+    const absoluteStartSample = Math.floor((rangeStartMs / 1000) * this.sampleRate);
+    const absoluteEndSample = Math.ceil((rangeEndMs / 1000) * this.sampleRate);
+    const chunkSamples = Math.max(
+      1,
+      Math.floor(
+        ((options.chunkDurationMs ?? ProjectAudioMixer.DEFAULT_CHUNK_MS) / 1000) * this.sampleRate,
       ),
     );
-    // Apply clip volume — a keyframed "volume" track overrides the static value.
-    const volTrack = clip.keyframes.find((k) => k.target === "volume");
-    const baseVol = clip.volume ?? 1;
-    if (volTrack || baseVol !== 1) {
-      for (const channel of processed) {
-        for (let i = 0; i < channel.length; i++) {
-          const relMs = (i / sampleRate) * 1000;
-          const v = volTrack ? (sampleKeyframeTrack(volTrack, relMs) ?? baseVol) : baseVol;
-          channel[i] = channel[i]! * v;
+    let duckGain = 1;
+
+    for (
+      let chunkStartSample = absoluteStartSample;
+      chunkStartSample < absoluteEndSample;
+      chunkStartSample += chunkSamples
+    ) {
+      throwIfAborted(options.signal);
+      const chunkEndSample = Math.min(absoluteEndSample, chunkStartSample + chunkSamples);
+      const length = chunkEndSample - chunkStartSample;
+      const voiceChannels: StereoChannels = [new Float32Array(length), new Float32Array(length)];
+      const musicChannels: StereoChannels = [new Float32Array(length), new Float32Array(length)];
+
+      for (const { clip, bus } of this.clips) {
+        const clipStartSample = Math.floor((clip.start / 1000) * this.sampleRate);
+        const clipEndSample = Math.ceil(((clip.start + clip.duration) / 1000) * this.sampleRate);
+        const overlapStart = Math.max(chunkStartSample, clipStartSample);
+        const overlapEnd = Math.min(chunkEndSample, clipEndSample);
+        if (overlapEnd <= overlapStart) continue;
+        throwIfAborted(options.signal);
+
+        const asset = this.getAsset(clip.assetId);
+        if (!asset || (asset.kind !== "video" && asset.kind !== "audio")) continue;
+        const decoded = await this.bufferFor(asset, options.signal);
+        if (!decoded) continue;
+
+        const effectPaddingSamples = clip.effects.length
+          ? Math.floor((ProjectAudioMixer.EFFECT_PADDING_MS / 1000) * this.sampleRate)
+          : 0;
+        const processStart = Math.max(clipStartSample, overlapStart - effectPaddingSamples);
+        const processEnd = Math.min(clipEndSample, overlapEnd + effectPaddingSamples);
+        const outputSamples = processEnd - processStart;
+        const clipOffsetMs = ((processStart - clipStartSample) / this.sampleRate) * 1000;
+        const [leftSource, rightSource] = decodedStereoChannels(decoded);
+        const processed = await Promise.all(
+          [leftSource, rightSource].map((source) =>
+            applyAudioEffects(
+              resampleClipAudioRange(
+                source,
+                decoded.sampleRate,
+                this.sampleRate,
+                clip,
+                clipOffsetMs,
+                outputSamples,
+              ),
+              clip.effects,
+              this.sampleRate,
+              clipOffsetMs,
+              clip.duration,
+            ),
+          ),
+        );
+        throwIfAborted(options.signal);
+
+        const volumeTrack = clip.keyframes.find((track) => track.target === "volume");
+        const baseVolume = clip.volume ?? 1;
+        if (volumeTrack || baseVolume !== 1) {
+          for (const channel of processed) {
+            for (let i = 0; i < channel.length; i++) {
+              const relativeMs = clipOffsetMs + (i / this.sampleRate) * 1000;
+              const volume = volumeTrack
+                ? (sampleKeyframeTrack(volumeTrack, relativeMs) ?? baseVolume)
+                : baseVolume;
+              channel[i] = channel[i]! * volume;
+            }
+          }
+        }
+
+        const target = bus === "music" ? musicChannels : voiceChannels;
+        const targetOffset = overlapStart - chunkStartSample;
+        const processedOffset = overlapStart - processStart;
+        const mixedSamples = overlapEnd - overlapStart;
+        for (let channel = 0; channel < 2; channel++) {
+          const input = processed[channel]!.subarray(
+            processedOffset,
+            processedOffset + mixedSamples,
+          );
+          const output = target[channel]!;
+          for (let i = 0; i < input.length; i++) output[targetOffset + i]! += input[i] ?? 0;
         }
       }
-    }
-    const buses = trackKindOfClip.get(clip.id) === "audio" ? musicChannels : voiceChannels;
-    for (let channel = 0; channel < 2; channel++) {
-      const processedChannel = processed[channel]!;
-      const bus = buses[channel]!;
-      for (let i = 0; i < processedChannel.length && startSample + i < bus.length; i++) {
-        bus[startSample + i]! += processedChannel[i] ?? 0;
-      }
+
+      const combined = await runCombineWorker({
+        voiceChannels,
+        musicChannels,
+        sampleRate: this.sampleRate,
+        initialDuckGain: duckGain,
+        ...(this.ducking ? { ducking: this.ducking } : {}),
+      });
+      duckGain = combined.finalDuckGain;
+      throwIfAborted(options.signal);
+      yield {
+        channels: combined.channels,
+        sampleRate: this.sampleRate,
+        startSample: chunkStartSample - absoluteStartSample,
+      };
     }
   }
 
-  // Bus combine + ducking + soft limiter run in a Web Worker so the heavy
-  // per-sample loops never touch the main thread. We transfer the bus buffers
-  // both ways, so there are zero copies despite the boundary crossing.
-  const channels = await runCombineWorker({
-    voiceChannels,
-    musicChannels,
-    sampleRate,
-    ...(ducking ? { ducking } : {}),
-  });
+  dispose(): void {
+    this.buffers.clear();
+    this.decodeContext = null;
+  }
 
-  return { channels, sampleRate };
-};
+  private async bufferFor(asset: MediaAsset, signal?: AbortSignal): Promise<AudioBuffer | null> {
+    if (this.buffers.has(asset.id)) {
+      const cached = this.buffers.get(asset.id) ?? null;
+      this.buffers.delete(asset.id);
+      this.buffers.set(asset.id, cached);
+      return cached;
+    }
+    throwIfAborted(signal);
+    const blob = await readMediaFile(asset.opfsPath);
+    if (!blob) return null;
+    let decoded: AudioBuffer | null = null;
+    try {
+      this.decodeContext ??= new OfflineAudioContext(1, 1, this.sampleRate);
+      decoded = await this.decodeContext.decodeAudioData(await blob.arrayBuffer());
+    } catch {
+      // Video without an audio stream and unsupported codecs are valid inputs;
+      // they simply contribute no PCM to the mix.
+    }
+    throwIfAborted(signal);
+    this.buffers.set(asset.id, decoded);
+    while (this.buffers.size > ProjectAudioMixer.MAX_DECODED_ASSETS) {
+      const oldest = this.buffers.keys().next().value;
+      if (oldest === undefined) break;
+      this.buffers.delete(oldest);
+    }
+    return decoded;
+  }
+}
 
 // Cached worker — created once on first export and reused across runs.
 let mixerWorker: Worker | null = null;
+let mixerRequestId = 0;
 const getWorker = (): Worker | null => {
   if (typeof Worker === "undefined") return null;
   if (mixerWorker) return mixerWorker;
@@ -324,18 +440,27 @@ const runCombineWorker = async (req: {
   voiceChannels: StereoChannels;
   musicChannels: StereoChannels;
   sampleRate: number;
+  initialDuckGain?: number;
   ducking?: { enabled: boolean; amountDb: number; thresholdDb: number };
-}): Promise<StereoChannels> => {
+}): Promise<{ channels: StereoChannels; finalDuckGain: number }> => {
   const w = getWorker();
   if (!w) {
     // Tests / SSR / browsers without Worker — run inline.
-    return combineInline(req);
+    return combineInlineStateful(req);
   }
-  return new Promise<StereoChannels>((resolve, reject) => {
-    const onMessage = (e: MessageEvent<{ channels: StereoChannels }>) => {
+  return new Promise<{ channels: StereoChannels; finalDuckGain: number }>((resolve, reject) => {
+    const requestId = ++mixerRequestId;
+    const onMessage = (
+      e: MessageEvent<{
+        requestId?: number;
+        channels: StereoChannels;
+        finalDuckGain: number;
+      }>,
+    ) => {
+      if (e.data.requestId !== requestId) return;
       w.removeEventListener("message", onMessage);
       w.removeEventListener("error", onError);
-      resolve(e.data.channels);
+      resolve({ channels: e.data.channels, finalDuckGain: e.data.finalDuckGain });
     };
     const onError = (err: ErrorEvent) => {
       w.removeEventListener("message", onMessage);
@@ -344,7 +469,7 @@ const runCombineWorker = async (req: {
     };
     w.addEventListener("message", onMessage);
     w.addEventListener("error", onError);
-    w.postMessage(req, [
+    w.postMessage({ ...req, requestId }, [
       req.voiceChannels[0].buffer,
       req.voiceChannels[1].buffer,
       req.musicChannels[0].buffer,

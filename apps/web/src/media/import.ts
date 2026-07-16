@@ -52,6 +52,7 @@ export const importMediaFile = async (file: File): Promise<ImportResult> => {
       ...(probe.width !== undefined ? { width: probe.width } : {}),
       ...(probe.height !== undefined ? { height: probe.height } : {}),
       opfsPath,
+      sizeBytes: file.size,
       ...(thumbDataUrl ? { thumbDataUrl } : {}),
       ...(filmstripDataUrl ? { filmstripDataUrl } : {}),
       ...(filmstripFrames !== undefined ? { filmstripFrames } : {}),

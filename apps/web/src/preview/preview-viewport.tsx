@@ -1,17 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
-import type { ID } from "@cut/core";
-import { useProjectStore, selectPlayhead } from "@/stores/project-store";
-import { usePlaybackStore } from "@/stores/playback-store";
 import { Compositor } from "@/renderer/compositor";
+import { usePlaybackStore } from "@/stores/playback-store";
+import { selectPlayhead, useProjectStore } from "@/stores/project-store";
+import type { ID } from "@cut/core";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 // Side-effect import: registers `window.__cutBench(frames)` in dev for
 // console-driven render benchmarks.
 import "@/renderer/bench";
 import { useT } from "@/i18n/use-t";
-import { RegionOverlay } from "./region-overlay";
 import { GuidesOverlay } from "./guides-overlay";
 import { PreviewControls } from "./preview-controls";
+import { RegionOverlay } from "./region-overlay";
 
 // Phase 3 preview: WebGL2 compositor. Visible clips at the playhead are
 // stacked and drawn into a single canvas, replacing the phase-1 single
@@ -26,6 +26,7 @@ export function PreviewViewport() {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const compositorRef = useRef<Compositor | null>(null);
+  const disposePendingRef = useRef<Compositor | null>(null);
   const renderingRef = useRef(false);
   const redrawPendingRef = useRef(false);
 
@@ -55,6 +56,11 @@ export function PreviewViewport() {
       })
       .finally(() => {
         renderingRef.current = false;
+        const pending = disposePendingRef.current;
+        if (pending) {
+          disposePendingRef.current = null;
+          pending.dispose();
+        }
         if (redrawPendingRef.current) queueMicrotask(pump);
       });
   }, []);
@@ -82,6 +88,13 @@ export function PreviewViewport() {
     ro.observe(canvas);
     return () => {
       ro.disconnect();
+      if (compositorRef.current !== compositor) return;
+      compositorRef.current = null;
+      redrawPendingRef.current = false;
+      // renderFrame can await media decode/seek work. Defer disposal until the
+      // in-flight frame settles so it cannot resume against released GL state.
+      if (renderingRef.current) disposePendingRef.current = compositor;
+      else compositor.dispose();
     };
   }, []);
 

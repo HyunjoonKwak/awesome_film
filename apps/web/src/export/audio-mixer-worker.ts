@@ -8,43 +8,40 @@
 type StereoChannels = [Float32Array, Float32Array];
 
 export interface MixerWorkerRequest {
+  readonly requestId?: number;
   readonly voiceChannels: StereoChannels;
   readonly musicChannels: StereoChannels;
   readonly sampleRate: number;
+  readonly initialDuckGain?: number;
   readonly ducking?: { enabled: boolean; amountDb: number; thresholdDb: number };
 }
 
 export interface MixerWorkerResponse {
+  readonly requestId?: number;
   readonly channels: StereoChannels;
+  readonly finalDuckGain: number;
 }
 
-const combine = (req: MixerWorkerRequest): StereoChannels => {
-  const { voiceChannels, musicChannels, sampleRate, ducking } = req;
+const combine = (req: MixerWorkerRequest): MixerWorkerResponse => {
+  const { voiceChannels, musicChannels, ducking } = req;
   const totalSamples = voiceChannels[0].length;
-  const accum: StereoChannels = [
-    new Float32Array(totalSamples),
-    new Float32Array(totalSamples),
-  ];
+  const accum: StereoChannels = [new Float32Array(totalSamples), new Float32Array(totalSamples)];
+  let finalDuckGain = req.initialDuckGain ?? 1;
   if (ducking?.enabled) {
     const duckGain = 10 ** (ducking.amountDb / 20);
     const threshold = 10 ** (ducking.thresholdDb / 20);
-    const win = Math.floor(sampleRate * 0.05);
-    let gain = 1;
+    let gain = finalDuckGain;
     for (let i = 0; i < totalSamples; i++) {
-      let voiceLevel = 0;
-      const end = Math.min(totalSamples, i + win);
-      for (let j = i; j < end; j += 8) {
-        voiceLevel = Math.max(
-          voiceLevel,
-          Math.abs(voiceChannels[0][j]!),
-          Math.abs(voiceChannels[1][j]!),
-        );
-      }
+      const voiceLevel = Math.max(
+        Math.abs(voiceChannels[0][i]!),
+        Math.abs(voiceChannels[1][i]!),
+      );
       const target = voiceLevel > threshold ? duckGain : 1;
       gain += (target - gain) * 0.002;
       accum[0][i] = voiceChannels[0][i]! + musicChannels[0][i]! * gain;
       accum[1][i] = voiceChannels[1][i]! + musicChannels[1][i]! * gain;
     }
+    finalDuckGain = gain;
   } else {
     for (let channel = 0; channel < 2; channel++) {
       const output = accum[channel]!;
@@ -55,31 +52,37 @@ const combine = (req: MixerWorkerRequest): StereoChannels => {
       }
     }
   }
-  // One shared limiter gain preserves the stereo image.
-  let peak = 0;
-  for (const channel of accum) {
-    for (let i = 0; i < channel.length; i++) peak = Math.max(peak, Math.abs(channel[i]!));
-  }
-  if (peak > 1) {
-    const gain = 1 / peak;
-    for (const channel of accum) {
-      for (let i = 0; i < channel.length; i++) channel[i]! *= gain;
+  // Limit each stereo sample with one shared gain. Unlike normalizing against
+  // the peak of an entire chunk, this produces identical output regardless of
+  // where streaming chunk boundaries happen to fall.
+  for (let i = 0; i < totalSamples; i++) {
+    const peak = Math.max(Math.abs(accum[0][i]!), Math.abs(accum[1][i]!));
+    if (peak > 1) {
+      const gain = 1 / peak;
+      accum[0][i]! *= gain;
+      accum[1][i]! *= gain;
     }
   }
-  return accum;
+  return { channels: accum, finalDuckGain };
 };
 
 // Worker entry. Guarded so this module can also be imported (e.g. for type
 // reuse) without crashing when there's no global `self.onmessage`.
 if (typeof self !== "undefined" && "onmessage" in self) {
   (self as unknown as Worker).onmessage = (e: MessageEvent<MixerWorkerRequest>) => {
-    const channels = combine(e.data);
-    (self as unknown as Worker).postMessage({ channels } satisfies MixerWorkerResponse, [
-      channels[0].buffer,
-      channels[1].buffer,
-    ]);
+    const result = combine(e.data);
+    (self as unknown as Worker).postMessage(
+      {
+        ...(e.data.requestId === undefined ? {} : { requestId: e.data.requestId }),
+        ...result,
+      } satisfies MixerWorkerResponse,
+      [result.channels[0].buffer, result.channels[1].buffer],
+    );
   };
 }
 
 // Fallback used by callers when Worker isn't available (jsdom / SSR).
-export const combineInline = combine;
+export const combineInline = (request: MixerWorkerRequest): StereoChannels =>
+  combine(request).channels;
+
+export const combineInlineStateful = combine;
