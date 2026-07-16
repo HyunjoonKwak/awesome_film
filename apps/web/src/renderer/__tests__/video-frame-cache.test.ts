@@ -38,6 +38,16 @@ describe("VideoFrameCache", () => {
     expect(c.nearest("a", 0)?.timestampUs).not.toBe(0);
   });
 
+  it("keeps a recently read frame when the LRU is full", () => {
+    const c = new VideoFrameCache();
+    for (let i = 0; i < 24; i++) c.store("a", stubFrame(i * 1000));
+    expect(c.nearest("a", 0)?.timestampUs).toBe(0);
+
+    c.store("a", stubFrame(24_000));
+    expect(c.nearest("a", 0)?.timestampUs).toBe(0);
+    expect(c.nearest("a", 1000)?.timestampUs).not.toBe(1000);
+  });
+
   it("forget releases all frames for one asset", () => {
     const c = new VideoFrameCache();
     const f = stubFrame(0);

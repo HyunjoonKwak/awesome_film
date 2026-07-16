@@ -96,6 +96,11 @@ export class Compositor {
 
   async renderFrame(project: Project, getAsset: (id: ID) => MediaAsset | undefined) {
     const gl = this.gl;
+    getFrameProvider().retain(
+      new Set(
+        project.mediaLibrary.filter((asset) => asset.kind === "video").map((asset) => asset.id),
+      ),
+    );
     const visible = visibleAt(project, project.timeline.playhead);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
@@ -112,8 +117,9 @@ export class Compositor {
         continue;
       }
       // Text clips may animate (typewriter changes the rendered glyphs).
-      const textAnim =
-        isTextClip(clip) ? textAnimAt(clip, Math.max(0, project.timeline.playhead - clip.start)) : null;
+      const textAnim = isTextClip(clip)
+        ? textAnimAt(clip, Math.max(0, project.timeline.playhead - clip.start))
+        : null;
       let sourceTex = await this.uploadClip(clip, getAsset, project, textAnim?.charFrac ?? 1);
       if (!sourceTex) continue;
 
@@ -165,20 +171,20 @@ export class Compositor {
           clip.blendMode as "overlay" | "soft-light",
         );
       } else {
-        setBlendMode(gl,clip.blendMode);
+        setBlendMode(gl, clip.blendMode);
         const prog = this.shaders.get("blit");
         prog.use();
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, finalTex);
         gl.uniform1i(prog.uniform("u_tex"), 0);
-        setTransformUniforms(gl, prog,composed);
-        setWipeUniforms(gl, prog,wipe);
-        setMaskUniforms(gl, prog,clip.mask);
+        setTransformUniforms(gl, prog, composed);
+        setWipeUniforms(gl, prog, wipe);
+        setMaskUniforms(gl, prog, clip.mask);
         this.quad.draw();
       }
     }
     // Restore default premultiplied-over blending for the next frame.
-    setBlendMode(gl,"normal");
+    setBlendMode(gl, "normal");
   }
 
   // Composites a clip with overlay/soft-light by capturing the backdrop and
@@ -198,7 +204,7 @@ export class Compositor {
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, w, h);
-    setBlendMode(gl,"normal");
+    setBlendMode(gl, "normal");
     const prog = this.shaders.get("blend-overlay");
     prog.use();
     gl.activeTexture(gl.TEXTURE0);
@@ -211,8 +217,8 @@ export class Compositor {
     if (resLoc) gl.uniform2f(resLoc, w, h);
     const modeLoc = prog.uniform("u_mode");
     if (modeLoc) gl.uniform1i(modeLoc, mode === "soft-light" ? 1 : 0);
-    setTransformUniforms(gl, prog,tf);
-    setMaskUniforms(gl, prog,mask);
+    setTransformUniforms(gl, prog, tf);
+    setMaskUniforms(gl, prog, mask);
     this.quad.draw();
   }
 
@@ -253,7 +259,6 @@ export class Compositor {
     return slot.tex;
   }
 
-
   // Captures the frame drawn so far, runs the adjustment's effect chain over
   // it, then redraws the result with the clip's mask + opacity. No-op when the
   // adjustment has no enabled effects.
@@ -272,7 +277,7 @@ export class Compositor {
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, w, h);
-    setBlendMode(gl,"normal");
+    setBlendMode(gl, "normal");
     const prog = this.shaders.get("blit");
     prog.use();
     gl.activeTexture(gl.TEXTURE0);
@@ -280,9 +285,9 @@ export class Compositor {
     gl.uniform1i(prog.uniform("u_tex"), 0);
     const tf = clipTransform(clip);
     const opacity = kfValues["transform.opacity"] ?? tf.opacity;
-    setTransformUniforms(gl, prog,{ x: 0, y: 0, scale: 1, rotation: 0, opacity });
-    setWipeUniforms(gl, prog,null);
-    setMaskUniforms(gl, prog,clip.mask);
+    setTransformUniforms(gl, prog, { x: 0, y: 0, scale: 1, rotation: 0, opacity });
+    setWipeUniforms(gl, prog, null);
+    setMaskUniforms(gl, prog, clip.mask);
     this.quad.draw();
   }
 
@@ -407,7 +412,8 @@ export class Compositor {
           if (Array.isArray(value)) {
             if (value.length === 2) gl.uniform2f(loc, value[0]!, value[1]!);
             else if (value.length === 3) gl.uniform3f(loc, value[0]!, value[1]!, value[2]!);
-            else if (value.length === 4) gl.uniform4f(loc, value[0]!, value[1]!, value[2]!, value[3]!);
+            else if (value.length === 4)
+              gl.uniform4f(loc, value[0]!, value[1]!, value[2]!, value[3]!);
           } else if (typeof value === "number") {
             gl.uniform1f(loc, value);
           }
@@ -422,10 +428,7 @@ export class Compositor {
 
   private readonly decodePrepared = new Set<string>();
 
-  private async uploadClipSource(
-    clip: MediaClip,
-    asset: MediaAsset,
-  ): Promise<WebGLTexture | null> {
+  private async uploadClipSource(clip: MediaClip, asset: MediaAsset): Promise<WebGLTexture | null> {
     // Map timeline time → source time. A frozen clip always shows one source
     // frame; otherwise this is the speed-ramp integral (or constant-speed).
     const clipRel = this.playheadFn() - clip.start;

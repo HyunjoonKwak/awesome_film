@@ -22,7 +22,7 @@ export class VideoFrameCache {
     const key = this.keyFor(assetId, frame.timestamp);
     if (this.map.has(key)) {
       // duplicate timestamp — replace, free old
-      this.map.get(key)!.frame.close();
+      this.map.get(key)?.frame.close();
       this.map.delete(key);
       const i = this.order.indexOf(key);
       if (i >= 0) this.order.splice(i, 1);
@@ -61,7 +61,16 @@ export class VideoFrameCache {
         best = f;
       }
     }
-    return bestDelta <= toleranceUs ? best : null;
+    if (!best || bestDelta > toleranceUs) return null;
+    // Touch on successful lookup so eviction follows actual LRU semantics,
+    // not merely insertion order.
+    const key = this.keyFor(best.assetId, best.timestampUs);
+    const index = this.order.indexOf(key);
+    if (index >= 0) {
+      this.order.splice(index, 1);
+      this.order.push(key);
+    }
+    return best;
   }
 
   forget(assetId: string): void {

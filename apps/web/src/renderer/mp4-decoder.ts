@@ -1,67 +1,114 @@
-// MP4 → encoded chunk → WebCodecs VideoDecoder pipeline. mp4box.js handles
-// the box parsing; we hand the resulting samples to VideoDecoder and stash
-// the decoded VideoFrames into the shared cache. Only video tracks are
-// considered — audio is mixed separately via WebAudio.
+// MP4 → encoded chunk → WebCodecs VideoDecoder pipeline. mp4box parses the
+// container incrementally; only samples around the requested playhead are read
+// from the Blob and decoded. This avoids copying and decoding the whole asset.
 
-// mp4box is loaded on demand — only paid when a video clip is decoded.
 import type { VideoFrameCache } from "./video-frame-cache";
 
-// mp4box.js ships without TS types we can rely on across versions; describe
-// only the surface we touch.
 interface MP4Sample {
+  alreadyRead?: number;
   cts: number;
   duration: number;
   timescale: number;
   is_sync: boolean;
-  data: Uint8Array;
+  number: number;
+  data?: Uint8Array;
 }
+
 interface MP4TrackInfo {
   id: number;
-  type: string;
+  type?: string;
   codec: string;
-  video: { width: number; height: number };
+  video?: { width: number; height: number };
 }
+
 interface MP4Info {
   duration: number;
   timescale: number;
   tracks: MP4TrackInfo[];
 }
+
 interface MP4File {
-  onError: (e: string) => void;
+  onError: (error: string) => void;
   onReady: (info: MP4Info) => void;
   onSamples: (id: number, user: unknown, samples: MP4Sample[]) => void;
-  setExtractionOptions: (id: number, user: unknown, opts: { nbSamples: number }) => void;
+  setExtractionOptions: (
+    id: number,
+    user: unknown,
+    options: { nbSamples: number; rapAlignement?: boolean },
+  ) => void;
+  unsetExtractionOptions: (id: number) => void;
   start: () => void;
-  appendBuffer: (b: ArrayBuffer & { fileStart: number }) => number;
+  stop: () => void;
+  seekTrack: (
+    timeSeconds: number,
+    useRap: boolean,
+    track: unknown,
+  ) => { offset: number; time: number };
+  appendBuffer: (buffer: MP4ArrayBuffer, last?: boolean) => number;
   flush: () => void;
   getTrackById: (id: number) => unknown;
+  releaseSample: (track: unknown, sampleNumber: number) => number;
 }
+
 type MP4ArrayBuffer = ArrayBuffer & { fileStart: number };
 
 export interface DecoderHandle {
   readonly assetId: string;
   readonly cache: VideoFrameCache;
-  readonly duration: number; // microseconds
+  readonly duration: number;
   readonly width: number;
   readonly height: number;
+  request(timestampUs: number): Promise<void>;
   close(): void;
 }
 
-const isMp4Available = (): boolean =>
-  typeof window !== "undefined" && "VideoDecoder" in window;
+export interface FrameDecodeWindow {
+  readonly startUs: number;
+  readonly endUs: number;
+}
 
-// Convert a sample into an EncodedVideoChunk in the format the decoder expects.
-const sampleToChunk = (sample: MP4Sample): EncodedVideoChunk =>
-  new EncodedVideoChunk({
+const METADATA_CHUNK_BYTES = 512 * 1024;
+const SAMPLE_CHUNK_BYTES = 1024 * 1024;
+const SAMPLES_PER_BATCH = 8;
+const FRAME_LOOK_BEHIND_US = 120_000;
+const FRAME_LOOK_AHEAD_US = 650_000;
+
+export const frameDecodeWindow = (timestampUs: number): FrameDecodeWindow => ({
+  startUs: Math.max(0, timestampUs - FRAME_LOOK_BEHIND_US),
+  endUs: timestampUs + FRAME_LOOK_AHEAD_US,
+});
+
+const isMp4Available = (): boolean => typeof window !== "undefined" && "VideoDecoder" in window;
+
+const readChunk = async (blob: Blob, start: number, length: number): Promise<MP4ArrayBuffer> => {
+  const end = Math.min(blob.size, start + length);
+  const buffer = (await blob.slice(start, end).arrayBuffer()) as MP4ArrayBuffer;
+  buffer.fileStart = start;
+  return buffer;
+};
+
+const advanceOffset = (
+  start: number,
+  bytesRead: number,
+  suggested: number,
+  size: number,
+): number => {
+  const end = Math.min(size, start + bytesRead);
+  return Number.isFinite(suggested) && suggested > end ? Math.min(size, suggested) : end;
+};
+
+const sampleToChunk = (sample: MP4Sample): EncodedVideoChunk | null => {
+  if (!sample.data) return null;
+  return new EncodedVideoChunk({
     type: sample.is_sync ? "key" : "delta",
     timestamp: (sample.cts * 1_000_000) / sample.timescale,
     duration: (sample.duration * 1_000_000) / sample.timescale,
     data: sample.data,
   });
+};
 
-// Best-effort `description` builder for AVC/HEVC streams. Some browsers can
-// configure the decoder without it; if extraction fails we return undefined
-// and rely on the in-band parameter sets in the first key frame.
+// Best-effort AVC/HEVC decoder description. Some streams contain parameter
+// sets in-band, so undefined remains a valid fallback.
 const description = (file: MP4File, trackId: number): Uint8Array | undefined => {
   try {
     const trak = file.getTrackById(trackId) as {
@@ -77,103 +124,207 @@ const description = (file: MP4File, trackId: number): Uint8Array | undefined => 
   }
 };
 
-// Decode an entire MP4 (or as much fits in the cache) into VideoFrames keyed
-// by the supplied assetId. Returns a handle for cancellation / lookup.
+const findVideoTrack = (info: MP4Info): MP4TrackInfo | null =>
+  info.tracks.find((track) => track.type === "video" || track.video !== undefined) ?? null;
+
+// Parse only enough of the Blob to discover `moov`. appendBuffer's suggested
+// offset lets us jump over a large mdat box directly to a trailing moov.
+const parseMetadata = async (blob: Blob, file: MP4File): Promise<MP4Info | null> => {
+  let info: MP4Info | null = null;
+  let failure: Error | null = null;
+  file.onReady = (ready) => {
+    info = ready;
+  };
+  file.onError = (message) => {
+    failure = new Error(`mp4box error: ${message}`);
+  };
+
+  let offset = 0;
+  while (!info && !failure && offset < blob.size) {
+    const chunk = await readChunk(blob, offset, METADATA_CHUNK_BYTES);
+    const suggested = file.appendBuffer(chunk, offset + chunk.byteLength >= blob.size);
+    offset = advanceOffset(offset, chunk.byteLength, suggested, blob.size);
+  }
+  if (!info && !failure) file.flush();
+  if (failure) throw failure;
+  return info;
+};
+
 export const decodeMp4ToCache = async (
   blob: Blob,
   assetId: string,
   cache: VideoFrameCache,
 ): Promise<DecoderHandle | null> => {
-  if (!isMp4Available()) return null;
-  const arrayBuf = (await blob.arrayBuffer()) as MP4ArrayBuffer;
-  arrayBuf.fileStart = 0;
+  if (!isMp4Available() || blob.size === 0) return null;
 
   const MP4Box = await import("mp4box");
-  return await new Promise<DecoderHandle | null>((resolve, reject) => {
-    const file = (MP4Box as unknown as { createFile: () => MP4File }).createFile();
-    let decoder: VideoDecoder | null = null;
-    let info: MP4Info | null = null;
-    let videoTrack: MP4Info["tracks"][number] | null = null;
+  // keepMdatData=false: mp4box discards media payload after sample extraction.
+  const file = (
+    MP4Box as unknown as { createFile: (keepMdatData?: boolean) => MP4File }
+  ).createFile(false);
+  const info = await parseMetadata(blob, file);
+  const track = info ? findVideoTrack(info) : null;
+  if (!info || !track?.video) return null;
 
-    const cleanup = () => {
-      try {
-        decoder?.close();
-      } catch {
-        /* ignore */
-      }
-    };
+  const config: VideoDecoderConfig = {
+    codec: track.codec,
+    codedWidth: track.video.width,
+    codedHeight: track.video.height,
+    ...(() => {
+      const value = description(file, track.id);
+      return value ? { description: value } : {};
+    })(),
+  };
 
-    file.onError = (e: string) => {
-      cleanup();
-      reject(new Error(`mp4box error: ${e}`));
-    };
+  let closed = false;
+  let generation = 0;
+  let activeDecoder: VideoDecoder | null = null;
+  let activeWindow: FrameDecodeWindow | null = null;
+  let activeJob: Promise<void> | null = null;
+  let queue = Promise.resolve();
+  const trackBox = file.getTrackById(track.id);
 
-    file.onReady = (mp4Info: MP4Info) => {
-      info = mp4Info;
-      const track = mp4Info.tracks.find((t) => t.type === "video");
-      if (!track) {
-        cleanup();
-        resolve(null);
-        return;
-      }
-      videoTrack = track;
+  const decodeWindow = async (
+    timestampUs: number,
+    window: FrameDecodeWindow,
+    requestGeneration: number,
+  ): Promise<void> => {
+    if (closed || requestGeneration !== generation) return;
+    cache.forget(assetId);
+    file.stop();
+    try {
+      file.unsetExtractionOptions(track.id);
+    } catch {
+      // No previous extraction registration.
+    }
 
-      decoder = new VideoDecoder({
-        output: (frame) => cache.store(assetId, frame),
-        error: (err) => {
-          // eslint-disable-next-line no-console
-          console.warn(`VideoDecoder error (${assetId}):`, err);
-        },
-      });
-
-      const codecString = track.codec;
-      try {
-        const desc = description(file, track.id);
-        const cfg: VideoDecoderConfig = {
-          codec: codecString,
-          codedWidth: track.video.width,
-          codedHeight: track.video.height,
-          ...(desc ? { description: desc } : {}),
-        };
-        decoder.configure(cfg);
-      } catch (err) {
-        cleanup();
-        reject(err);
-        return;
-      }
-
-      file.setExtractionOptions(track.id, null, { nbSamples: 100 });
-      file.start();
-    };
-
-    file.onSamples = (_id: number, _user: unknown, samples: MP4Sample[]) => {
-      if (!decoder || decoder.state === "closed") return;
-      for (const sample of samples) {
-        try {
-          decoder.decode(sampleToChunk(sample));
-        } catch {
-          /* ignore single-sample decode errors */
+    try {
+      activeDecoder?.close();
+    } catch {
+      // The decoder error callback may already have closed it.
+    }
+    let decoderFailure: Error | null = null;
+    const decoder = new VideoDecoder({
+      output: (frame) => {
+        if (
+          closed ||
+          requestGeneration !== generation ||
+          frame.timestamp < window.startUs ||
+          frame.timestamp > window.endUs
+        ) {
+          frame.close();
+          return;
         }
+        cache.store(assetId, frame);
+      },
+      error: (error) => {
+        decoderFailure = error instanceof Error ? error : new Error(String(error));
+      },
+    });
+    activeDecoder = decoder;
+    decoder.configure(config);
+
+    let reachedWindowEnd = false;
+    file.onSamples = (_id, _user, samples) => {
+      if (closed || requestGeneration !== generation) return;
+      for (const sample of samples) {
+        const sampleTimestampUs = (sample.cts * 1_000_000) / sample.timescale;
+        if (sampleTimestampUs > window.endUs) {
+          reachedWindowEnd = true;
+          file.stop();
+          break;
+        }
+        const chunk = sampleToChunk(sample);
+        if (chunk) {
+          try {
+            decoder.decode(chunk);
+          } catch {
+            // A corrupt sample should not poison the fallback video path.
+          }
+        }
+        // releaseSample works for forward and backward seeks, unlike the
+        // monotonic releaseUsedSamples helper.
+        file.releaseSample(trackBox, sample.number);
       }
     };
 
-    file.appendBuffer(arrayBuf);
-    file.flush();
-
-    // Resolve the handle right away — frames stream into the cache async.
-    queueMicrotask(() => {
-      if (!info || !videoTrack) {
-        resolve(null);
-        return;
-      }
-      resolve({
-        assetId,
-        cache,
-        duration: (info.duration * 1_000_000) / info.timescale,
-        width: videoTrack.video.width,
-        height: videoTrack.video.height,
-        close: cleanup,
-      });
+    file.setExtractionOptions(track.id, null, {
+      nbSamples: SAMPLES_PER_BATCH,
+      rapAlignement: true,
     });
-  });
+    const seek = file.seekTrack(Math.max(0, timestampUs) / 1_000_000, true, trackBox);
+    let offset = Math.max(0, Math.floor(seek.offset));
+    file.start();
+
+    while (!closed && requestGeneration === generation && !reachedWindowEnd && offset < blob.size) {
+      const chunk = await readChunk(blob, offset, SAMPLE_CHUNK_BYTES);
+      if (closed || requestGeneration !== generation) break;
+      const suggested = file.appendBuffer(chunk, offset + chunk.byteLength >= blob.size);
+      offset = advanceOffset(offset, chunk.byteLength, suggested, blob.size);
+    }
+    file.stop();
+    file.unsetExtractionOptions(track.id);
+
+    if (!closed && requestGeneration === generation) {
+      try {
+        await decoder.flush();
+      } catch {
+        // Decoder failures leave the HTMLVideoElement fallback in control.
+      }
+    }
+    if (decoderFailure) cache.forget(assetId);
+    if (activeDecoder === decoder) activeDecoder = null;
+    try {
+      decoder.close();
+    } catch {
+      // Already closed after a decoder error.
+    }
+  };
+
+  const request = (timestampUs: number): Promise<void> => {
+    if (closed) return Promise.resolve();
+    if (
+      activeJob &&
+      activeWindow &&
+      timestampUs >= activeWindow.startUs &&
+      timestampUs <= activeWindow.endUs
+    ) {
+      return activeJob;
+    }
+
+    const requestGeneration = ++generation;
+    const window = frameDecodeWindow(timestampUs);
+    activeWindow = window;
+    const job = queue
+      .catch(() => {})
+      .then(() => decodeWindow(timestampUs, window, requestGeneration))
+      .finally(() => {
+        if (activeJob === job) activeJob = null;
+      });
+    queue = job;
+    activeJob = job;
+    return job;
+  };
+
+  return {
+    assetId,
+    cache,
+    duration: (info.duration * 1_000_000) / info.timescale,
+    width: track.video.width,
+    height: track.video.height,
+    request,
+    close: () => {
+      if (closed) return;
+      closed = true;
+      generation++;
+      file.stop();
+      try {
+        activeDecoder?.close();
+      } catch {
+        // Already closed after a decoder error.
+      }
+      activeDecoder = null;
+      cache.forget(assetId);
+    },
+  };
 };
