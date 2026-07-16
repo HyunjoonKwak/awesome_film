@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { normalizeRoomCode, resolveCollabServer } from "../collab-config";
+import {
+  isLocalCollabServer,
+  normalizeRoomCode,
+  resolveCollabServer,
+  resolveCollabTicketUrl,
+} from "../collab-config";
 
 describe("collaboration configuration", () => {
   it("requires an explicitly configured server", () => {
@@ -41,5 +46,16 @@ describe("collaboration configuration", () => {
     expect(normalizeRoomCode("  cut-12345678  ")).toBe("cut-12345678");
     expect(normalizeRoomCode("short")).toBeNull();
     expect(normalizeRoomCode("room with spaces")).toBeNull();
+  });
+
+  it("requires secure ticket endpoints for remote authentication", () => {
+    expect(resolveCollabTicketUrl("/api/collab-ticket", "https://editor.example/app")).toBe(
+      "https://editor.example/api/collab-ticket",
+    );
+    expect(
+      resolveCollabTicketUrl("http://auth.example/ticket", "https://editor.example"),
+    ).toBeNull();
+    expect(isLocalCollabServer("ws://localhost:32120")).toBe(true);
+    expect(isLocalCollabServer("wss://collab.example.com")).toBe(false);
   });
 });

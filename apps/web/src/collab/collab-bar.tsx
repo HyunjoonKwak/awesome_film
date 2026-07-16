@@ -5,7 +5,12 @@ import { LogOut, Share2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAwarenessStore } from "./awareness-store";
-import { configuredCollabServer, normalizeRoomCode } from "./collab-config";
+import {
+  configuredCollabServer,
+  configuredCollabTicketUrl,
+  isLocalCollabServer,
+  normalizeRoomCode,
+} from "./collab-config";
 import { useCollabSessionStore } from "./collab-session-store";
 import { useMediaTransferStore } from "./media-transfer-store";
 import { getBridge } from "./yjs-bridge";
@@ -30,7 +35,7 @@ export function CollabBar() {
     previousStatus.current = connectionStatus;
   }, [connectionStatus, joinedRoom, t]);
 
-  const join = () => {
+  const join = async () => {
     try {
       const server = configuredCollabServer();
       if (!server.ok) {
@@ -48,7 +53,32 @@ export function CollabBar() {
         toast.error(t("collab.roomInvalid"));
         return;
       }
-      getBridge().joinRoom(server.url, `cut-editor:${roomCode}`);
+      const roomName = `cut-editor:${roomCode}`;
+      let token: string | undefined;
+      if (!isLocalCollabServer(server.url)) {
+        const ticketUrl = configuredCollabTicketUrl();
+        if (!ticketUrl) {
+          toast.error(t("collab.ticketMissing"));
+          return;
+        }
+        const response = await fetch(ticketUrl, {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ room: roomName }),
+        });
+        if (!response.ok) throw new Error(`ticket request failed (${response.status})`);
+        const payload = (await response.json()) as { token?: unknown };
+        if (
+          typeof payload.token !== "string" ||
+          payload.token.length < 16 ||
+          payload.token.length > 4096
+        ) {
+          throw new Error("ticket endpoint returned an invalid token");
+        }
+        token = payload.token;
+      }
+      getBridge().joinRoom(server.url, roomName, token);
     } catch (err) {
       toast.error(
         t("collab.joinFailed", { msg: err instanceof Error ? err.message : String(err) }),
@@ -126,7 +156,7 @@ export function CollabBar() {
           />
           <button
             type="button"
-            onClick={join}
+            onClick={() => void join()}
             className="btn-ghost px-2 py-1 text-xs"
             title={t("collab.share")}
           >

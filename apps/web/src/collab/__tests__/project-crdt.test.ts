@@ -1,4 +1,4 @@
-import { createEmptyProject, type ID, type MediaClip, type Project, type Track } from "@cut/core";
+import { type ID, type MediaClip, type Project, type Track, createEmptyProject } from "@cut/core";
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import { createProjectCrdt } from "../project-crdt";
@@ -123,5 +123,24 @@ describe("project CRDT", () => {
     const rebuilt = crdt.read(base.id, localView);
     expect(rebuilt?.timeline.playhead).toBe(900);
     expect(rebuilt?.timeline.zoom).toBe(0.25);
+  });
+
+  it("rejects malformed values received from a remote peer", () => {
+    const base = createEmptyProject();
+    const firstTrack = base.timeline.tracks[0];
+    expect(firstTrack).toBeDefined();
+    if (!firstTrack) return;
+
+    const doc = new Y.Doc();
+    const crdt = createProjectCrdt(doc);
+    crdt.write(base);
+
+    doc.getMap("tracks-v2").set(firstTrack.id, {
+      ...firstTrack,
+      clips: undefined,
+      height: -1,
+    });
+
+    expect(crdt.read(base.id, base.timeline)).toBeNull();
   });
 });

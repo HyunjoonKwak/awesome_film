@@ -12,6 +12,10 @@ export interface MediaAsset {
   readonly width?: number;
   readonly height?: number;
   readonly opfsPath: string;       // key into OPFS file store (full-res original)
+  readonly sizeBytes?: number;     // full-res byte length; lets a peer detect an
+                                   // incomplete/partial OPFS file (e.g. a media
+                                   // transfer interrupted by a crash) instead of
+                                   // trusting mere existence
   readonly proxyPath?: string;     // optional low-res proxy in OPFS
   readonly proxyWidth?: number;    // proxy resolution
   readonly proxyHeight?: number;

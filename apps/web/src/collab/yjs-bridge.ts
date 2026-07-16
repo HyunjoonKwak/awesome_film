@@ -5,7 +5,7 @@ import { WebsocketProvider } from "y-websocket";
 import * as Y from "yjs";
 import { type PeerCursor, useAwarenessStore } from "./awareness-store";
 import { useCollabSessionStore } from "./collab-session-store";
-import { createMediaTransferManager, type MediaTransferManager } from "./media-transfer";
+import { type MediaTransferManager, createMediaTransferManager } from "./media-transfer";
 import { createProjectCrdt } from "./project-crdt";
 import { useSaveStateStore } from "./save-state-store";
 
@@ -57,7 +57,7 @@ export interface CollabBridge {
   readonly doc: Y.Doc;
   readonly persistence: IndexeddbPersistence;
   ws: WebsocketProvider | null;
-  joinRoom: (server: string, room: string) => void;
+  joinRoom: (server: string, room: string, token?: string) => void;
   leaveRoom: () => void;
   dispose: () => void;
 }
@@ -96,6 +96,11 @@ export const getBridge = (): CollabBridge => {
     if (!project) return null;
     applyingRemote = true;
     try {
+      // Remote apply clears local undo history on purpose. Our history stores
+      // full project snapshots, so KEEPING the stack across a concurrent remote
+      // edit would let a local undo revert to a pre-merge snapshot and clobber
+      // the peer's change — and that loss would propagate back through the CRDT.
+      // Operation-scoped/rebased undo that survives remote merges is future work.
       useProjectStore.getState().loadProject(project);
       doc.transact(() => projectCrdt.write(project), LOCAL_ORIGIN);
     } finally {
@@ -215,10 +220,12 @@ export const getBridge = (): CollabBridge => {
     if (bridge) bridge.ws = null;
   };
 
-  const joinRoom = (server: string, room: string) => {
+  const joinRoom = (server: string, room: string, token?: string) => {
     destroyProvider();
     useCollabSessionStore.getState().setConnection(room, "connecting");
-    const provider = new WebsocketProvider(server, room, doc);
+    const provider = new WebsocketProvider(server, room, doc, {
+      ...(token ? { params: { token } } : {}),
+    });
     ws = provider;
     statusSync = ({ status }) => {
       if (disposed || ws !== provider) return;

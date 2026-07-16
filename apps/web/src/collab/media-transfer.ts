@@ -269,7 +269,13 @@ export const createMediaTransferManager = ({
       for (const asset of getProject().mediaLibrary) {
         if (disposed || localRequest()) return;
         if (asset.id === failedAssetId || !isSafeMediaKey(asset.opfsPath)) continue;
-        if (await storage.read(asset.opfsPath)) continue;
+        const existing = await storage.read(asset.opfsPath);
+        // A present-but-wrong-size file is incomplete: a crash mid-transfer
+        // leaves a partial/0-byte blob at the final path. Re-fetch it instead
+        // of trusting existence, so it never masquerades as complete forever.
+        if (existing && (asset.sizeBytes === undefined || existing.size === asset.sizeBytes)) {
+          continue;
+        }
         const currentAsset = findAsset(asset.id);
         if (!currentAsset || currentAsset.opfsPath !== asset.opfsPath) continue;
         const request: MediaRequest = {

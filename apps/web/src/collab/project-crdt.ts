@@ -1,3 +1,4 @@
+import { parseStoredProject } from "@/persistence/project-export";
 import type { Clip, MediaAsset, Project, Track } from "@cut/core";
 import type * as Y from "yjs";
 import { reconcileSequence, uniqueSequence } from "./crdt-sequence";
@@ -126,7 +127,7 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
       return null;
     }
 
-    return {
+    const candidate = {
       id: projectId,
       name,
       createdAt,
@@ -143,6 +144,14 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
         markers: markers as NonNullable<Project["timeline"]["markers"]>,
       },
     };
+    try {
+      // Yjs values come from remote peers and do not retain their TypeScript
+      // types at runtime. Reuse the persistence boundary schema before any
+      // collaborative state reaches the renderer or project store.
+      return parseStoredProject(candidate);
+    } catch {
+      return null;
+    }
   };
 
   return {
