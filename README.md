@@ -36,13 +36,13 @@ plugin SDK.
 | Core model | Immutable Project / Track / Clip / Effect / Keyframe / Transition + undo/redo |
 | Timeline | Multi-track, magnetic snap, ripple, trim/split/move, drag-between-tracks, pinch-zoom |
 | Renderer | WebGL2 compositor, ping-pong FBOs, multi-pass effect chain, keyframe interpolation |
-| Effects | Brightness, Gaussian blur, vignette, background removal — all GLSL ES 3.0 fragment passes |
+| Effects | 24 built-in GPU/audio effects, 1D/3D `.cube` LUTs, vector masks, blend modes, and background removal |
 | Text | Canvas2D-rendered text clips with size/color/bg controls + a dedicated subtitles track |
 | Media | OPFS-backed assets, thumbnail/waveform probe, drag-drop ingest |
 | AI (all local) | Auto silence cut (WebAudio RMS), Whisper transcription (HuggingFace), Scene detect (χ²), Background removal (MediaPipe Selfie) |
-| Export | WebCodecs H.264/VP9/AV1 + AAC audio mixer, four presets (YouTube 1080p/4K, TikTok 9:16, Web VP9) |
-| Persistence | Yjs CRDT + IndexedDB — survives reloads, browser restarts |
-| Collaboration | y-websocket join/leave by room code, awareness pills in top bar |
+| Export | WebCodecs H.264/VP9/AV1 + stereo AAC mixer, LUFS normalization, work ranges, four presets |
+| Persistence | Validated project library + snapshots, Yjs/IndexedDB state, OPFS media, corruption-safe recovery |
+| Collaboration | Configurable y-websocket rooms, connection state, CRDT edits, awareness, peer media transfer |
 | Plugin SDK | `window.cutEditor.registerEffect` + `registerShader`, load-by-URL via `localStorage["cut.plugins"]` |
 | Mobile | Reactive shell with drawer panels + two-finger pinch zoom |
 
@@ -50,7 +50,8 @@ plugin SDK.
 
 ```
 apps/web/         Next.js 15 app (editor UI)
-packages/core/    Framework-agnostic engine (data model, scheduler, renderer)
+apps/desktop/     Electron wrapper (macOS .app/.dmg packaging)
+packages/core/    Framework-agnostic project model, edit commands, and timeline algorithms
 docs/             Design notes + plugin SDK
 reference/        OpenCut clone for study (gitignored)
 ```
@@ -78,8 +79,9 @@ pnpm --filter @cut/web exec playwright install chromium  # first run only
 pnpm test:e2e
 ```
 
-The suite starts an isolated local editor server and verifies navigation,
-IndexedDB project recovery after reload, and collaboration configuration errors.
+The suite starts isolated editor and Yjs relay servers. It verifies navigation,
+IndexedDB project recovery after reload, two-browser CRDT edits, and byte-exact
+peer media transfer into the receiving browser's OPFS.
 
 ## Install as an app on macOS
 
@@ -172,9 +174,10 @@ required.
 ## Roadmap (post v0.1)
 
 - WebGPU renderer (wgsl shaders, plugin SDK v2)
-- Per-clip transforms (translate/rotate/scale) with keyframe UI
-- Mask drawing tool + tracking
-- Native desktop wrapper (Tauri)
+- Compound / nested sequences
+- Background render queue
+- Per-language subtitle tracks and translation workflow
+- Effect preview thumbnails and GIF / image-sequence export
 - Mobile native shells (Capacitor)
 - Plugin marketplace + sandboxed iframes
 

@@ -1,9 +1,7 @@
 # Honest gap analysis — where we are vs FCP / CapCut / DaVinci Resolve
 
-First written 2026-05 (Phases 1–16). **Re-audited 2026-07** against the actual
-code after Phases 17–25 landed: almost everything the May draft marked missing
-has since shipped. The tables below reflect the **current** tree, not the
-original plan. See git history for the pre-July version.
+First written 2026-05 and **re-audited 2026-07-16** against the current tree.
+The tables describe shipped behavior, not the original phase plan.
 
 Legend: ✅ shipped • 🟡 partial / needs work • ❌ missing
 
@@ -12,13 +10,13 @@ Legend: ✅ shipped • 🟡 partial / needs work • ❌ missing
 | Capability | Status | Notes |
 | -- | :--: | -- |
 | H.264 MP4 export (WebCodecs) | ✅ | 4 presets (YT 1080p/4K, TikTok 9:16, Web VP9) |
-| Audio mixing into export | ✅ | OfflineAudioContext + AudioEncoder AAC |
+| Audio mixing into export | ✅ | Per-channel effects + worker mix + stereo AAC |
 | Clip transform applied (pos/scale/rot) | ✅ | Vertex-shader affine transform, keyframe overrides (`compositor.ts`) |
 | Transitions rendered | ✅ | fade/dissolve/dip/slide/zoom/spin + GPU wipe mask |
 | Effect keyframe interpolation in export | ✅ | Compositor samples per-frame |
 | Export progress + cancel button | ✅ | Progress, fps, ETA, working cancel |
 | Loudness normalization | ✅ | LUFS measure + normalize |
-| Stereo export | ❌ | Audio mixer hardcodes mono / 48 kHz (`exporter.ts:64`, `audio-mixer.ts`) |
+| Stereo export | ✅ | Mono sources duplicate; stereo sources preserve L/R through planar AAC |
 | Lossless / proxy export | ❌ | One quality per preset |
 | GIF / image-sequence export | ❌ | |
 
@@ -47,7 +45,7 @@ Legend: ✅ shipped • 🟡 partial / needs work • ❌ missing
 | Stylize (sepia/invert/film grain) | ✅ | `sepia`, `invert`, `grain` |
 | Audio effects (EQ/gate/fade/denoise) | ✅ | 5 audio effects incl. FFT spectral denoise |
 | Effect reordering | ✅ | Drag-and-drop in `effects-section.tsx` |
-| 1D LUT support | ❌ | `parse-cube.ts:29` throws "not supported yet" (3D LUTs work) |
+| 1D LUT support | ✅ | 1D/3D `.cube` files and non-default domain bounds |
 | Effect preview thumbnails | ❌ | |
 
 ## 4. GPU performance
@@ -58,9 +56,9 @@ Legend: ✅ shipped • 🟡 partial / needs work • ❌ missing
 | WebCodecs VideoDecoder for playback | ✅ | `mp4-decoder.ts` + mp4box demux |
 | LRU VideoFrame cache | ✅ | `video-frame-cache.ts` (tested) |
 | WebGPU | ❌ | Future; WebGL2 is fine for now |
-| Texture pool / explicit GPU memory cap | ❌ | Leaks possible on very long sessions |
+| Texture pool / explicit GPU memory cap | ✅ | Bounded LRU caches with deterministic disposal |
 | Off-main-thread render (worker) | ❌ | Compositor runs on main; OK for now |
-| MediaPipe mask cached per frame | 🟡 | **Still recomputed every render** (`compositor.ts:479`) — heavy |
+| MediaPipe mask cached per frame | ✅ | Reused at unchanged source time; bounded and disposed |
 | Scene-detect / motion-track use WebCodecs decoder | ❌ | Still serial `<video>.currentTime` seeking — slow |
 
 ## 5. Component / editing UX
@@ -86,29 +84,31 @@ Legend: ✅ shipped • 🟡 partial / needs work • ❌ missing
 | Multi-project library | ✅ | `project-library.ts` + `project-menu.tsx` |
 | JSON project export / import | ✅ | `project-export.ts` (now round-trip tested) |
 | Media bin search / filter / delete | ✅ | + OPFS storage meter |
-| Version snapshots | 🟡 | `snapshots.ts` exists; no named-snapshot UI |
+| Version snapshots | ✅ | Named save/restore/delete UI with validated restore |
 | Media metadata (codec, bitrate, fps) | 🟡 | Only width/height/duration captured |
-| Trash / recycle bin | ❌ | Delete is immediate |
+| Trash / recycle bin | ❌ | No restore UI; blob cleanup is deferred to safe startup GC |
 
-## What actually remains — the real backlog (2026-07)
+## What actually remains — the real backlog (2026-07-16)
 
-The feature gaps are now mostly **polish**. The load-bearing gaps are in
-**engineering health**, not features:
+The load-bearing reliability backlog identified in the earlier audit is closed:
+CI runs lint/typecheck/unit/build/browser tests; persistence is validated and
+corruption-safe; renderer caches are bounded; collaboration has real two-browser
+CRDT and binary-transfer coverage; and export preserves stereo.
 
-1. **Test coverage ≈ 5.7%.** `core/timeline` and audio DSP are well tested;
-   `stores`, `persistence`, `commands/history`, `ai`, and the entire React UI
-   are (mostly) untested. Highest-risk untested area: persistence save/load.
-   *(2026-07: added round-trip tests for `project-export` and `text-anim`.)*
-2. **`packages/core` half-empty.** `ai/collab/export/media/playback/renderer`
-   dirs are 0-byte. The real implementations live in `apps/web`, so nothing is
-   broken — but the "framework-agnostic engine" goal stalled at model+timeline,
-   and the empty dirs are dead scaffolding to either fill or delete.
-3. **CI quality gate.** *(2026-07: added `ci.yml` — lint/typecheck/test on
-   every push + PR. Previously only a manual release workflow existed.)*
-4. **Perf**: MediaPipe mask recompute per frame; AI sampling doesn't reuse the
-   WebCodecs decoder; no GPU texture cap.
-5. **Feature polish**: stereo export, per-language subtitle tracks, 1D LUTs,
-   effect preview thumbnails, named version snapshots, GIF export.
+The remaining items are product expansion or performance polish:
+
+1. **Broader interaction coverage.** There are 119 unit tests plus three
+   Playwright flows, but complex drag/trim/mask/multicam UI interactions and AI
+   cancellation paths still rely mainly on manual testing.
+2. **AI analysis speed.** Scene detection and motion tracking still seek a
+   media element serially instead of sharing the WebCodecs decoder.
+3. **Main-thread rendering.** The compositor is bounded but remains on the main
+   thread; an OffscreenCanvas worker or WebGPU backend is future work.
+4. **Feature expansion.** Per-language subtitle tracks/translation, effect
+   preview thumbnails, GIF/image-sequence export, and compound sequences.
+5. **Operational hardening.** A production collaboration deployment still
+   needs an authenticated, rate-limited relay; the repository only configures
+   the client and a local test relay.
 
 Everything flows through the same immutable command pipeline, so undo/redo and
 collaboration stay free as these land.

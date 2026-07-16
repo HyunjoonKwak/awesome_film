@@ -1,4 +1,4 @@
-# Plugin SDK (Phase 15)
+# Plugin SDK
 
 cut_editor is open at runtime — third parties can ship effects and shaders
 without rebuilding the editor. The surface is intentionally tiny:

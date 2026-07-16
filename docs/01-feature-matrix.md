@@ -1,75 +1,83 @@
-# Feature Matrix: cut_editor vs OpenCut vs CapCut vs Final Cut Pro
+# Feature matrix: cut_editor vs OpenCut vs CapCut vs Final Cut Pro
 
-Legend: ✅ shipped • 🟡 partial • ❌ missing • ⭐ our differentiator
+This is a directional product comparison, not a benchmark or compatibility
+promise. The cut_editor column reflects the current repository as of
+2026-07-16.
+
+Legend: ✅ shipped • 🟡 partial • ❌ missing • ⭐ differentiator
 
 ## Editing core
 
-| Capability                       | OpenCut | CapCut | FCP | cut_editor target |
-| -------------------------------- | :-----: | :----: | :-: | :---------------: |
-| Multi-track timeline             |   ✅    |   ✅   | ✅  |        ✅         |
-| Magnetic timeline (FCP style)    |   🟡    |   ❌   | ✅  |        ✅         |
-| Ripple / roll / slip / slide     |   🟡    |   🟡   | ✅  |        ✅         |
-| Compound clips / nesting         |   ❌    |   🟡   | ✅  |        ✅         |
-| Frame-accurate scrub             |   ✅    |   ✅   | ✅  |        ✅         |
-| Keyframe animation               |   ✅    |   ✅   | ✅  |        ✅         |
-| Color grading (scopes, curves)   |   🟡    |   🟡   | ✅  |     ✅ + LUTs     |
-| Speed ramps + pitch preservation |   ✅    |   ✅   | ✅  |        ✅         |
-| Time remapping                   |   ✅    |   🟡   | ✅  |        ✅         |
-| Multicam editing                 |   ❌    |   ❌   | ✅  |     ✅ ⭐ web      |
+| Capability | OpenCut | CapCut | FCP | cut_editor current |
+| --- | :---: | :---: | :---: | :---: |
+| Multi-track timeline | ✅ | ✅ | ✅ | ✅ |
+| Magnetic snap and ripple edits | 🟡 | 🟡 | ✅ | ✅ |
+| Roll / slip / slide / split | 🟡 | 🟡 | ✅ | ✅ |
+| Compound / nested sequences | ❌ | 🟡 | ✅ | ❌ |
+| Frame-aware scrub and playback | ✅ | ✅ | ✅ | ✅ |
+| Keyframed transforms/effects/speed | ✅ | ✅ | ✅ | ✅ |
+| Pitch-preserving speed changes | ✅ | ✅ | ✅ | ❌ |
+| Color scopes, grading, 1D/3D LUTs | 🟡 | 🟡 | ✅ | ✅ |
+| Multicam program editing | ❌ | ❌ | ✅ | ✅ ⭐ |
 
-## Effects & graphics
+## Effects and graphics
 
-| Capability                  | OpenCut | CapCut | FCP | cut_editor target |
-| --------------------------- | :-----: | :----: | :-: | :---------------: |
-| GPU-accelerated effects     |   ✅    |   ✅   | ✅  |        ✅         |
-| Mask / shape masks          |   ✅    |   ✅   | ✅  |        ✅         |
-| Text + animated text        |   ✅    |   ✅   | ✅  |        ✅         |
-| Stickers / overlays         |   ✅    |   ✅   | 🟡  |        ✅         |
-| Transitions library         |   ✅    |   ✅   | ✅  |        ✅         |
-| User plugin/SDK for effects |   ❌    |   ❌   | ✅  |       ⭐ ✅        |
+| Capability | OpenCut | CapCut | FCP | cut_editor current |
+| --- | :---: | :---: | :---: | :---: |
+| GPU effect chain | ✅ | ✅ | ✅ | ✅ |
+| Vector clip masks / blend modes | ✅ | ✅ | ✅ | ✅ |
+| Text, subtitle, and shape clips | ✅ | ✅ | ✅ | ✅ |
+| Sticker/template catalog | ✅ | ✅ | 🟡 | ❌ |
+| Transitions | ✅ | ✅ | ✅ | ✅ |
+| Runtime effect/plugin SDK | ❌ | ❌ | ✅ | ✅ ⭐ |
+| Sandboxed plugin marketplace | ❌ | ❌ | ✅ | ❌ |
 
-## AI features (our biggest opportunity)
+## Local AI and automation
 
-| Capability                       | OpenCut | CapCut | FCP | cut_editor target |
-| -------------------------------- | :-----: | :----: | :-: | :---------------: |
-| Auto subtitles (local)           |   ✅    |   ✅   | 🟡  |  ✅ Whisper WASM  |
-| Multilingual translation         |   🟡    |   ✅   | ❌  |        ✅         |
-| Auto silence removal             |   ❌    |   ✅   | ❌  |       ⭐ ✅        |
-| Scene / shot detection           |   ❌    |   ✅   | 🟡  |       ⭐ ✅        |
-| Auto color match across clips    |   ❌    |   🟡   | ✅  |       ⭐ ✅        |
-| Background removal (no greenscr) |   ❌    |   ✅   | 🟡  | ⭐ ✅ MediaPipe   |
-| Voice / vocal stem isolation     |   🟡    |   ✅   | 🟡  |       ⭐ ✅        |
-| Motion tracking                  |   ❌    |   ✅   | ✅  |        ✅         |
-| Smart reframe (vertical / 9:16)  |   ❌    |   ✅   | ❌  |       ⭐ ✅        |
-| Auto B-roll suggest              |   ❌    |   🟡   | ❌  |       ⭐ ✅        |
+| Capability | OpenCut | CapCut | FCP | cut_editor current |
+| --- | :---: | :---: | :---: | :---: |
+| Automatic subtitles | ✅ | ✅ | 🟡 | ✅ local Whisper |
+| Multilingual translation | 🟡 | ✅ | ❌ | ❌ |
+| Silence removal | ❌ | ✅ | ❌ | ✅ local |
+| Scene detection | ❌ | ✅ | 🟡 | ✅ local |
+| Background removal | ❌ | ✅ | 🟡 | ✅ local MediaPipe |
+| Motion tracking | ❌ | ✅ | ✅ | ✅ local |
+| Beat markers | 🟡 | ✅ | 🟡 | ✅ local |
+| Automatic white balance | 🟡 | 🟡 | ✅ | ✅ local |
+| Voice/stem isolation | 🟡 | ✅ | 🟡 | ❌ |
+| Automatic B-roll suggestions | ❌ | 🟡 | ❌ | ❌ |
 
-## Collaboration & ops
+## Collaboration and persistence
 
-| Capability                       | OpenCut | CapCut | FCP | cut_editor target |
-| -------------------------------- | :-----: | :----: | :-: | :---------------: |
-| Realtime multi-user co-edit      |   ❌    |   🟡   | ❌  |  ⭐ ✅ CRDT/Yjs   |
-| Comment threads on timeline      |   ❌    |   🟡   | ❌  |       ⭐ ✅        |
-| Project version history          |   🟡    |   ✅   | ✅  | ⭐ ✅ git-style   |
-| Cloud sync of projects + media   |   ✅    |   ✅   | 🟡  |        ✅         |
-| Offline-first / PWA              |   🟡    |   ❌   | n/a |       ⭐ ✅        |
-| Mobile-native gestures           |   ❌    |   ✅   | n/a |       ⭐ ✅        |
-| Export presets (TikTok/YT/Reels) |   🟡    |   ✅   | 🟡  |        ✅         |
+| Capability | OpenCut | CapCut | FCP | cut_editor current |
+| --- | :---: | :---: | :---: | :---: |
+| Realtime project co-edit | ❌ | 🟡 | ❌ | ✅ ⭐ CRDT |
+| Peer media transfer | ❌ | ✅ | ❌ | ✅ ⭐ |
+| Presence / playhead awareness | ❌ | 🟡 | ❌ | ✅ |
+| Comment threads | ❌ | 🟡 | ❌ | ❌ |
+| Named local snapshots | 🟡 | ✅ | ✅ | ✅ |
+| Offline-first project/media storage | 🟡 | ❌ | n/a | ✅ ⭐ |
+| Hosted cloud project service | ✅ | ✅ | 🟡 | ❌ |
+| JSON project portability | ✅ | ❌ | 🟡 | ✅ |
 
-## Platform reach
+## Output and platform
 
-| Capability                | OpenCut | CapCut | FCP | cut_editor target |
-| ------------------------- | :-----: | :----: | :-: | :---------------: |
-| Web                       |   ✅    |   ✅   | ❌  |        ✅         |
-| Desktop (Win/Mac/Linux)   |   🟡    |   ✅   | 🟡  |        ✅         |
-| Mobile (iOS/Android)      |   🟡    |   ✅   | ❌  |        ✅         |
-| Open source / self-hosted |   ✅    |   ❌   | ❌  |        ✅         |
-| Free for all features     |   ✅    |   🟡   | ❌  |        ✅         |
+| Capability | OpenCut | CapCut | FCP | cut_editor current |
+| --- | :---: | :---: | :---: | :---: |
+| H.264 / VP9 / AV1 video | 🟡 | ✅ | ✅ | ✅ |
+| Stereo AAC and LUFS normalization | 🟡 | ✅ | ✅ | ✅ |
+| Work-range and social presets | 🟡 | ✅ | ✅ | ✅ |
+| GIF / image sequence | 🟡 | ✅ | ✅ | ❌ |
+| Browser / installable PWA | ✅ | ✅ | ❌ | ✅ |
+| Packaged desktop app | 🟡 | ✅ | ✅ | ✅ Electron (macOS release) |
+| Native iOS / Android shell | 🟡 | ✅ | ❌ | ❌ |
+| Open source / self-hostable | ✅ | ❌ | ❌ | ✅ ⭐ |
 
-## Our north-star bet
+## North star
 
-Beat FCP/CapCut on the four axes neither can compete on simultaneously:
+The differentiating combination remains:
 
-1. **Open & free** like OpenCut
-2. **AI-native** like CapCut (and beyond)
-3. **Collaborative** like Figma — no competitor does this for video well
-4. **Web/mobile-first** with progressive desktop power
+1. open and self-hostable;
+2. useful local AI without uploading source media;
+3. Figma-style realtime project and media collaboration;
+4. one web codebase shared by PWA and desktop packaging.

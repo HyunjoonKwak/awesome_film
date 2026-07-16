@@ -34,13 +34,13 @@ SDK는 [`docs/03-plugin-sdk.md`](docs/03-plugin-sdk.md)를 참고하세요.
 | 코어 모델 | 불변 Project / Track / Clip / Effect / Keyframe / Transition + 실행취소·다시실행 |
 | 타임라인 | 멀티트랙, 마그네틱 스냅, 리플, 트림/분할/이동, 트랙 간 드래그, 핀치 줌 |
 | 렌더러 | WebGL2 컴포지터, ping-pong FBO, 다중 패스 이펙트 체인, 키프레임 보간 |
-| 이펙트 | 밝기, 가우시안 블러, 비네트, 배경 제거 — 모두 GLSL ES 3.0 프래그먼트 패스 |
+| 이펙트 | GPU/오디오 이펙트 24종, 1D/3D `.cube` LUT, 벡터 마스크, 블렌드 모드, 배경 제거 |
 | 텍스트 | Canvas2D 렌더 텍스트 클립(크기/색/배경 조절) + 전용 자막 트랙 |
 | 미디어 | OPFS 기반 자산, 썸네일/파형 분석, 드래그-드롭 입수 |
 | AI (전부 로컬) | 자동 묵음 컷(WebAudio RMS), Whisper 자막(HuggingFace), 장면 감지(χ²), 배경 제거(MediaPipe Selfie) |
-| 내보내기 | WebCodecs H.264/VP9/AV1 + AAC 오디오 믹서, 4종 프리셋 (YouTube 1080p/4K, TikTok 9:16, Web VP9) |
-| 영속화 | Yjs CRDT + IndexedDB — 새로고침·브라우저 재시작에도 유지 |
-| 협업 | y-websocket 룸 코드 입장/퇴장, 상단 바에 awareness 표시 |
+| 내보내기 | WebCodecs H.264/VP9/AV1 + 스테레오 AAC, LUFS 정규화, 작업 구간, 4종 프리셋 |
+| 영속화 | 검증된 프로젝트 라이브러리·스냅샷, Yjs/IndexedDB 상태, OPFS 미디어, 손상 복구 |
+| 협업 | 설정 가능한 y-websocket 룸, 연결 상태, CRDT 편집, awareness, 피어 미디어 전송 |
 | 플러그인 SDK | `window.cutEditor.registerEffect` + `registerShader`, `localStorage["cut.plugins"]`로 URL 로드 |
 | 모바일 | 반응형 셸 + 드로어 패널 + 투핑거 핀치 줌 |
 
@@ -49,7 +49,7 @@ SDK는 [`docs/03-plugin-sdk.md`](docs/03-plugin-sdk.md)를 참고하세요.
 ```
 apps/web/         Next.js 15 앱 (에디터 UI)
 apps/desktop/     Electron 셸 (macOS .app/.dmg 패키징)
-packages/core/    프레임워크 독립 엔진 (데이터 모델, 스케줄러, 렌더러)
+packages/core/    프레임워크 독립 프로젝트 모델, 편집 명령, 타임라인 알고리즘
 docs/             설계 문서 + 플러그인 SDK
 reference/        학습용 OpenCut 클론 (gitignored)
 ```
@@ -77,8 +77,9 @@ pnpm --filter @cut/web exec playwright install chromium  # 최초 1회
 pnpm test:e2e
 ```
 
-테스트는 격리된 로컬 에디터 서버를 실행해 화면 진입, 새로고침 후 IndexedDB
-프로젝트 복원, 협업 설정 오류 안내를 검증합니다.
+테스트는 격리된 에디터와 Yjs 릴레이 서버를 실행해 화면 진입, 새로고침 후
+IndexedDB 프로젝트 복원, 두 브라우저 간 CRDT 편집과 수신 브라우저 OPFS의
+미디어 바이트 일치까지 검증합니다.
 
 ## macOS 앱으로 설치하기
 
@@ -168,9 +169,10 @@ Developer Secret 5개 (`CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`,
 ## 로드맵 (v0.1 이후)
 
 - WebGPU 렌더러 (wgsl 셰이더, 플러그인 SDK v2)
-- 클립별 트랜스폼(이동/회전/스케일) + 키프레임 UI
-- 마스크 그리기 도구 + 트래킹
-- Tauri 네이티브 데스크톱 래퍼
+- 컴파운드/네스티드 시퀀스
+- 백그라운드 렌더 큐
+- 언어별 자막 트랙과 번역 워크플로
+- 이펙트 미리보기 썸네일과 GIF/이미지 시퀀스 내보내기
 - Capacitor 모바일 네이티브 셸
 - 플러그인 마켓플레이스 + 샌드박스 iframe
 

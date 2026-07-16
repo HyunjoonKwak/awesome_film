@@ -66,8 +66,8 @@ export default function HomePage() {
         </section>
 
         <footer className="mt-24 text-xs text-ink-3">
-          Phase 0 — scaffold. See <code className="text-ink-2">docs/02-architecture.md</code>{" "}
-          for the roadmap.
+          Local-first editing, AI tools, and realtime collaboration — source and
+          architecture notes live in <code className="text-ink-2">docs/</code>.
         </footer>
       </div>
     </main>
