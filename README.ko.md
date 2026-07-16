@@ -70,6 +70,16 @@ pnpm dev          # http://localhost:3000
 
 요구사항: Node 20+, pnpm 9+.
 
+### 브라우저 E2E 테스트
+
+```bash
+pnpm --filter @cut/web exec playwright install chromium  # 최초 1회
+pnpm test:e2e
+```
+
+테스트는 격리된 로컬 에디터 서버를 실행해 화면 진입, 새로고침 후 IndexedDB
+프로젝트 복원, 협업 설정 오류 안내를 검증합니다.
+
 ## macOS 앱으로 설치하기
 
 cut_editor는 PWA manifest + 서비스 워커를 동봉하므로 별도 도구 없이 독립

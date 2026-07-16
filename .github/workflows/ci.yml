@@ -50,3 +50,9 @@ jobs:
       # static Electron export + .dmg packaging still live in release.yml.
       - name: Build (web production)
         run: pnpm --filter @cut/web build
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @cut/web exec playwright install --with-deps chromium
+
+      - name: Browser E2E
+        run: pnpm test:e2e

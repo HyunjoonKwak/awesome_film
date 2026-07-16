@@ -7,10 +7,11 @@
     "dev": "next dev --turbopack -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
-    "lint": "biome lint src",
+    "lint": "biome lint src e2e playwright.config.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "format": "biome format --write src",
+    "test:e2e": "playwright test",
+    "format": "biome format --write src e2e playwright.config.ts",
     "knip": "pnpm --dir ../.. exec knip --workspace apps/web",
     "prebundle:whisper": "node scripts/download-whisper.mjs"
   },
@@ -39,6 +40,7 @@
     "zustand": "^5.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.51.1",
     "@types/node": "^22.9.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

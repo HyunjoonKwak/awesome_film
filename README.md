@@ -71,6 +71,16 @@ releases read the same URL from the GitHub Actions repository variable
 
 Requirements: Node 20+, pnpm 9+.
 
+### Browser E2E tests
+
+```bash
+pnpm --filter @cut/web exec playwright install chromium  # first run only
+pnpm test:e2e
+```
+
+The suite starts an isolated local editor server and verifies navigation,
+IndexedDB project recovery after reload, and collaboration configuration errors.
+
 ## Install as an app on macOS
 
 cut_editor ships a PWA manifest + service worker so you can install it as a
