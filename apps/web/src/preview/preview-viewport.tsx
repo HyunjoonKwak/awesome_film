@@ -108,12 +108,15 @@ export function PreviewViewport() {
     let last = performance.now();
     const tick = (now: number) => {
       if (cancelled) return;
-      const dt = now - last;
+      // The first rAF timestamp is the frame's start time, which can PRECEDE
+      // the performance.now() captured above — an unclamped negative dt at
+      // playhead 0 made `next <= 0` and stopped playback the instant it began.
+      const dt = Math.max(0, now - last);
       last = now;
       const rate = usePlaybackStore.getState().rate;
       const timeline = useProjectStore.getState().project.timeline;
       const next = timeline.playhead + dt * rate;
-      if (next <= 0) {
+      if (rate < 0 && next <= 0) {
         setPlayhead(0);
         usePlaybackStore.getState().setPlaying(false);
       } else if (timeline.duration > 0 && next >= timeline.duration) {
