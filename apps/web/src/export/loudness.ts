@@ -2,8 +2,8 @@
 //
 // The signal is K-weighted (a high-shelf "pre" filter followed by an RLB
 // high-pass), split into 400 ms blocks with 75% overlap, then gated in two
-// stages (absolute -70 LUFS, then relative -10 LU) before averaging. The mix
-// is mono at a fixed 48 kHz, so the channel weighting term G is 1.0.
+// stages (absolute -70 LUFS, then relative -10 LU) before averaging. Each
+// mono/stereo channel is K-weighted independently with channel weight G=1.0.
 
 interface Coef {
   readonly b0: number;
@@ -60,30 +60,36 @@ const ABSOLUTE_GATE = -70; // LUFS
 const RELATIVE_GATE = -10; // LU below the ungated mean
 
 export const measureLoudness = (
-  pcm: Float32Array,
+  pcm: Float32Array | readonly Float32Array[],
   sampleRate = 48_000,
 ): LoudnessResult => {
+  const channels = pcm instanceof Float32Array ? [pcm] : pcm;
   let peak = 0;
-  for (let i = 0; i < pcm.length; i++) {
-    const a = Math.abs(pcm[i]!);
-    if (a > peak) peak = a;
+  for (const channel of channels) {
+    for (let i = 0; i < channel.length; i++) {
+      const a = Math.abs(channel[i]!);
+      if (a > peak) peak = a;
+    }
   }
   const peakDbfs = peak > 0 ? 20 * Math.log10(peak) : Number.NEGATIVE_INFINITY;
 
-  const weighted = biquad(biquad(pcm, PRE), RLB);
+  const weightedChannels = channels.map((channel) => biquad(biquad(channel, PRE), RLB));
+  const length = Math.min(...weightedChannels.map((channel) => channel.length));
   const blockLen = Math.round(BLOCK_SECONDS * sampleRate);
   const step = Math.max(1, Math.round(blockLen * (1 - OVERLAP)));
-  if (weighted.length < blockLen) {
+  if (!Number.isFinite(length) || length < blockLen) {
     return { integratedLufs: Number.NEGATIVE_INFINITY, peakDbfs };
   }
 
   // Mean square per block.
   const meanSquares: number[] = [];
-  for (let start = 0; start + blockLen <= weighted.length; start += step) {
+  for (let start = 0; start + blockLen <= length; start += step) {
     let sum = 0;
-    for (let i = start; i < start + blockLen; i++) {
-      const v = weighted[i]!;
-      sum += v * v;
+    for (const channel of weightedChannels) {
+      for (let i = start; i < start + blockLen; i++) {
+        const v = channel[i]!;
+        sum += v * v;
+      }
     }
     meanSquares.push(sum / blockLen);
   }

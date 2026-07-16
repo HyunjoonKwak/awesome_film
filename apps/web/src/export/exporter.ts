@@ -1,7 +1,7 @@
 import { type Project, msToFrames, framesToMs } from "@cut/core";
 import { Muxer, ArrayBufferTarget } from "mp4-muxer";
 import { Compositor } from "@/renderer/compositor";
-import { mixProjectAudio } from "./audio-mixer";
+import { mixProjectAudio, packStereoPlanar } from "./audio-mixer";
 import { useDuckingStore } from "./ducking-store";
 import { useNormalizeStore } from "./normalize-store";
 import { measureLoudness } from "./loudness";
@@ -60,7 +60,7 @@ export class WebCodecsExporter implements Exporter {
         height: preset.height,
         frameRate: preset.fps,
       },
-      ...(includeAudio ? { audio: { codec: "aac", numberOfChannels: 1, sampleRate: 48_000 } } : {}),
+      ...(includeAudio ? { audio: { codec: "aac", numberOfChannels: 2, sampleRate: 48_000 } } : {}),
       fastStart: "in-memory",
       firstTimestampBehavior: "offset",
     });
@@ -127,23 +127,28 @@ export class WebCodecsExporter implements Exporter {
           amountDb: duck.amountDb,
           thresholdDb: duck.thresholdDb,
         });
-        if (mixed && mixed.pcm.length > 0) {
+        if (mixed && mixed.channels[0].length > 0) {
           // Clip the mix to the export work area when one is set.
           if (range.inMs !== null || range.outMs !== null) {
             const from = Math.floor((rangeStart / 1000) * mixed.sampleRate);
             const to = Math.floor((rangeEnd / 1000) * mixed.sampleRate);
-            mixed.pcm = mixed.pcm.slice(Math.max(0, from), Math.min(mixed.pcm.length, to));
+            for (let channel = 0; channel < 2; channel++) {
+              const pcm = mixed.channels[channel]!;
+              mixed.channels[channel] = pcm.slice(Math.max(0, from), Math.min(pcm.length, to));
+            }
           }
           // Loudness normalization: bring integrated LUFS to the target with a
           // single master gain (skip if already silent or on-target).
           const norm = useNormalizeStore.getState();
           if (norm.enabled) {
-            const { integratedLufs } = measureLoudness(mixed.pcm, mixed.sampleRate);
+            const { integratedLufs } = measureLoudness(mixed.channels, mixed.sampleRate);
             if (Number.isFinite(integratedLufs)) {
               const gain = 10 ** ((norm.targetLufs - integratedLufs) / 20);
               if (Math.abs(gain - 1) > 0.01) {
-                for (let i = 0; i < mixed.pcm.length; i++) {
-                  mixed.pcm[i] = Math.max(-1, Math.min(1, mixed.pcm[i]! * gain));
+                for (const channel of mixed.channels) {
+                  for (let i = 0; i < channel.length; i++) {
+                    channel[i] = Math.max(-1, Math.min(1, channel[i]! * gain));
+                  }
                 }
               }
             }
@@ -158,19 +163,21 @@ export class WebCodecsExporter implements Exporter {
           audioEncoder.configure({
             codec: "mp4a.40.2",
             sampleRate: mixed.sampleRate,
-            numberOfChannels: 1,
+            numberOfChannels: 2,
             bitrate: preset.audioBitrateKbps * 1000,
           });
           const CHUNK = 1024;
-          for (let i = 0; i < mixed.pcm.length; i += CHUNK) {
-            const slice = mixed.pcm.slice(i, Math.min(i + CHUNK, mixed.pcm.length));
+          const totalSamples = Math.min(mixed.channels[0].length, mixed.channels[1].length);
+          for (let i = 0; i < totalSamples; i += CHUNK) {
+            const numberOfFrames = Math.min(CHUNK, totalSamples - i);
+            const planar = packStereoPlanar(mixed.channels, i, numberOfFrames);
             const data = new AudioData({
-              format: "f32",
+              format: "f32-planar",
               sampleRate: mixed.sampleRate,
-              numberOfFrames: slice.length,
-              numberOfChannels: 1,
+              numberOfFrames,
+              numberOfChannels: 2,
               timestamp: Math.round((i / mixed.sampleRate) * 1_000_000),
-              data: slice,
+              data: planar,
             });
             try {
               audioEncoder.encode(data);

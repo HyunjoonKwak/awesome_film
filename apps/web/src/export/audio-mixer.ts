@@ -179,19 +179,45 @@ export interface DuckingOptions {
   thresholdDb: number;
 }
 
-// Sums all audio clips into a single mono PCM stream at 48 kHz, applying each
+type StereoChannels = [Float32Array, Float32Array];
+
+export const decodedStereoChannels = (
+  buffer: Pick<AudioBuffer, "numberOfChannels" | "getChannelData">,
+): readonly [Float32Array, Float32Array] => {
+  const left = buffer.getChannelData(0);
+  return [left, buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : left];
+};
+
+export const packStereoPlanar = (
+  channels: readonly [Float32Array, Float32Array],
+  from: number,
+  numberOfFrames: number,
+): Float32Array<ArrayBuffer> => {
+  const planar: Float32Array<ArrayBuffer> = new Float32Array(numberOfFrames * 2);
+  planar.set(channels[0].subarray(from, from + numberOfFrames));
+  planar.set(channels[1].subarray(from, from + numberOfFrames), numberOfFrames);
+  return planar;
+};
+
+// Sums all audio clips into a stereo PCM stream at 48 kHz, applying each
 // clip's audio effects. With ducking on, audio-track clips (music) are
 // attenuated wherever video-track audio (voice) exceeds the threshold.
 export const mixProjectAudio = async (
   project: Project,
   getAsset: (id: ID) => MediaAsset | undefined,
   ducking?: DuckingOptions,
-): Promise<{ pcm: Float32Array; sampleRate: number } | null> => {
+): Promise<{ channels: StereoChannels; sampleRate: number } | null> => {
   const sampleRate = 48_000;
   const totalSamples = Math.ceil((project.timeline.duration / 1000) * sampleRate);
   if (totalSamples <= 0) return null;
-  const voiceBus = new Float32Array(totalSamples);
-  const musicBus = new Float32Array(totalSamples);
+  const voiceChannels: StereoChannels = [
+    new Float32Array(totalSamples),
+    new Float32Array(totalSamples),
+  ];
+  const musicChannels: StereoChannels = [
+    new Float32Array(totalSamples),
+    new Float32Array(totalSamples),
+  ];
   const ctx = new OfflineAudioContext(1, totalSamples, sampleRate);
 
   // Which bus a clip belongs to, by its track kind.
@@ -233,37 +259,50 @@ export const mixProjectAudio = async (
     if (!isMediaClip(clip)) continue;
     const buf = buffers.get(clip.assetId);
     if (!buf) continue;
-    const src = buf.getChannelData(0);
     const startSample = Math.floor((clip.start / 1000) * sampleRate);
-    const slice = resampleClipAudio(src, buf.sampleRate, sampleRate, clip);
-    const processed = await applyAudioEffects(slice, clip.effects, sampleRate);
+    const [leftSource, rightSource] = decodedStereoChannels(buf);
+    const processed = await Promise.all(
+      [leftSource, rightSource].map((source) =>
+        applyAudioEffects(
+          resampleClipAudio(source, buf.sampleRate, sampleRate, clip),
+          clip.effects,
+          sampleRate,
+        ),
+      ),
+    );
     // Apply clip volume — a keyframed "volume" track overrides the static value.
     const volTrack = clip.keyframes.find((k) => k.target === "volume");
     const baseVol = clip.volume ?? 1;
     if (volTrack || baseVol !== 1) {
-      for (let i = 0; i < processed.length; i++) {
-        const relMs = (i / sampleRate) * 1000;
-        const v = volTrack ? (sampleKeyframeTrack(volTrack, relMs) ?? baseVol) : baseVol;
-        processed[i] = processed[i]! * v;
+      for (const channel of processed) {
+        for (let i = 0; i < channel.length; i++) {
+          const relMs = (i / sampleRate) * 1000;
+          const v = volTrack ? (sampleKeyframeTrack(volTrack, relMs) ?? baseVol) : baseVol;
+          channel[i] = channel[i]! * v;
+        }
       }
     }
-    const bus = trackKindOfClip.get(clip.id) === "audio" ? musicBus : voiceBus;
-    for (let i = 0; i < processed.length && startSample + i < bus.length; i++) {
-      bus[startSample + i]! += processed[i] ?? 0;
+    const buses = trackKindOfClip.get(clip.id) === "audio" ? musicChannels : voiceChannels;
+    for (let channel = 0; channel < 2; channel++) {
+      const processedChannel = processed[channel]!;
+      const bus = buses[channel]!;
+      for (let i = 0; i < processedChannel.length && startSample + i < bus.length; i++) {
+        bus[startSample + i]! += processedChannel[i] ?? 0;
+      }
     }
   }
 
   // Bus combine + ducking + soft limiter run in a Web Worker so the heavy
   // per-sample loops never touch the main thread. We transfer the bus buffers
   // both ways, so there are zero copies despite the boundary crossing.
-  const accum = await runCombineWorker({
-    voiceBus,
-    musicBus,
+  const channels = await runCombineWorker({
+    voiceChannels,
+    musicChannels,
     sampleRate,
     ...(ducking ? { ducking } : {}),
   });
 
-  return { pcm: accum, sampleRate };
+  return { channels, sampleRate };
 };
 
 // Cached worker — created once on first export and reused across runs.
@@ -282,21 +321,21 @@ const getWorker = (): Worker | null => {
 };
 
 const runCombineWorker = async (req: {
-  voiceBus: Float32Array;
-  musicBus: Float32Array;
+  voiceChannels: StereoChannels;
+  musicChannels: StereoChannels;
   sampleRate: number;
   ducking?: { enabled: boolean; amountDb: number; thresholdDb: number };
-}): Promise<Float32Array> => {
+}): Promise<StereoChannels> => {
   const w = getWorker();
   if (!w) {
     // Tests / SSR / browsers without Worker — run inline.
     return combineInline(req);
   }
-  return new Promise<Float32Array>((resolve, reject) => {
-    const onMessage = (e: MessageEvent<{ pcm: Float32Array }>) => {
+  return new Promise<StereoChannels>((resolve, reject) => {
+    const onMessage = (e: MessageEvent<{ channels: StereoChannels }>) => {
       w.removeEventListener("message", onMessage);
       w.removeEventListener("error", onError);
-      resolve(e.data.pcm);
+      resolve(e.data.channels);
     };
     const onError = (err: ErrorEvent) => {
       w.removeEventListener("message", onMessage);
@@ -305,6 +344,11 @@ const runCombineWorker = async (req: {
     };
     w.addEventListener("message", onMessage);
     w.addEventListener("error", onError);
-    w.postMessage(req, [req.voiceBus.buffer, req.musicBus.buffer]);
+    w.postMessage(req, [
+      req.voiceChannels[0].buffer,
+      req.voiceChannels[1].buffer,
+      req.musicChannels[0].buffer,
+      req.musicChannels[1].buffer,
+    ]);
   });
 };

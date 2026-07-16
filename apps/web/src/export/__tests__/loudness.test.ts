@@ -30,4 +30,14 @@ describe("measureLoudness", () => {
     expect(Number.isFinite(loud.integratedLufs)).toBe(true);
     expect(loud.integratedLufs).toBeGreaterThan(quiet.integratedLufs);
   });
+
+  it("measures stereo energy without phase-cancelling opposing channels", () => {
+    const left = sine(0.25, 1000, 2);
+    const right = Float32Array.from(left, (sample) => -sample);
+    const mono = measureLoudness(left, 48_000);
+    const stereo = measureLoudness([left, right], 48_000);
+
+    expect(Number.isFinite(stereo.integratedLufs)).toBe(true);
+    expect(stereo.integratedLufs - mono.integratedLufs).toBeCloseTo(3.01, 1);
+  });
 });

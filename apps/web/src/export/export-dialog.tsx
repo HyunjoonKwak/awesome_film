@@ -105,7 +105,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
         toast.error(t("loudness.noAudio"));
         return;
       }
-      setLoudness(measureLoudness(mixed.pcm, mixed.sampleRate));
+      setLoudness(measureLoudness(mixed.channels, mixed.sampleRate));
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
       toast.error(t("export.failed", { msg }));
