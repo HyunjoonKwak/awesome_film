@@ -108,6 +108,7 @@ const saveWindowState = (win) => {
       JSON.stringify({ ...bounds, maximized: win.isMaximized() }),
     );
   } catch (err) {
+    // biome-ignore lint/suspicious/noConsole: Main-process persistence failures belong in desktop logs.
     console.warn("[cut-desktop] could not persist window state:", err?.message ?? err);
   }
 };
@@ -117,9 +118,7 @@ const createWindow = () => {
   const win = new BrowserWindow({
     width: state?.width ?? 1440,
     height: state?.height ?? 900,
-    ...(Number.isFinite(state?.x) && Number.isFinite(state?.y)
-      ? { x: state.x, y: state.y }
-      : {}),
+    ...(Number.isFinite(state?.x) && Number.isFinite(state?.y) ? { x: state.x, y: state.y } : {}),
     minWidth: 960,
     minHeight: 600,
     backgroundColor: "#0b0d10",
@@ -285,17 +284,21 @@ const setupAutoUpdater = () => {
     autoUpdater.autoDownload = true;
     autoUpdater.autoInstallOnAppQuit = true;
     autoUpdater.on("error", (err) => {
+      // biome-ignore lint/suspicious/noConsole: Auto-updater diagnostics run outside the renderer UI.
       console.warn("[cut-desktop] auto-update error:", err?.message ?? err);
     });
     autoUpdater.on("update-available", (info) => {
+      // biome-ignore lint/suspicious/noConsole: Auto-updater diagnostics run outside the renderer UI.
       console.log("[cut-desktop] update available:", info?.version);
     });
     autoUpdater.on("update-downloaded", (info) => {
+      // biome-ignore lint/suspicious/noConsole: Auto-updater diagnostics run outside the renderer UI.
       console.log("[cut-desktop] update downloaded:", info?.version, "— will install on quit");
     });
     // Defer the check briefly so the window is up first.
     setTimeout(() => autoUpdater.checkForUpdatesAndNotify().catch(() => {}), 3000);
   } catch (err) {
+    // biome-ignore lint/suspicious/noConsole: Missing updater support must remain visible in desktop logs.
     console.warn("[cut-desktop] electron-updater unavailable:", err?.message ?? err);
   }
 };
@@ -338,7 +341,12 @@ app.on("window-all-closed", () => {
 });
 
 // Diagnostic helper for verifying the bundle in CI.
-// eslint-disable-next-line no-console
-console.log("[cut-desktop] booting", { isDev, devUrl: DEV_URL, webOut: WEB_OUT, exists: fs.existsSync(WEB_OUT) });
+// biome-ignore lint/suspicious/noConsole: Desktop boot paths are verified from main-process logs.
+console.log("[cut-desktop] booting", {
+  isDev,
+  devUrl: DEV_URL,
+  webOut: WEB_OUT,
+  exists: fs.existsSync(WEB_OUT),
+});
 // Silence the unused-export warning for pathToFileURL when no callers reach it.
 void pathToFileURL;

@@ -525,7 +525,7 @@ export class Compositor {
       this.bgMaskTime.set(asset.id, srcTime);
       return tex;
     } catch (err) {
-      // eslint-disable-next-line no-console
+      // biome-ignore lint/suspicious/noConsole: MediaPipe failures otherwise disappear silently.
       console.warn("bg-remove mask failed:", err);
       return null;
     }

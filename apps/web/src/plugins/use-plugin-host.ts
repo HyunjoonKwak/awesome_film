@@ -24,6 +24,7 @@ export const usePluginHost = () => {
       s.type = "module";
       s.src = url;
       s.onerror = () => {
+        // biome-ignore lint/suspicious/noConsole: Plugin script failures have no richer error channel.
         console.warn("Failed to load plugin:", url);
       };
       document.head.appendChild(s);

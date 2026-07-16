@@ -67,6 +67,7 @@ export function PreviewViewport() {
       try {
         compositorRef.current = new Compositor(canvas);
       } catch (err) {
+        // biome-ignore lint/suspicious/noConsole: Preserve initialization details for GPU diagnostics.
         console.error("Failed to init WebGL compositor", err);
         return;
       }

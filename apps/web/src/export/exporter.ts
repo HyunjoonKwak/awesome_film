@@ -20,10 +20,7 @@ export class WebCodecsExporter implements Exporter {
     this.cancelled = true;
   }
 
-  async start(
-    req: ExportRequest,
-    onProgress: (p: ExportProgress) => void,
-  ): Promise<ExportResult> {
+  async start(req: ExportRequest, onProgress: (p: ExportProgress) => void): Promise<ExportResult> {
     if (!isWebCodecsSupported()) {
       throw new Error(
         "Video export needs the WebCodecs API, which this browser doesn't support. " +
@@ -63,9 +60,7 @@ export class WebCodecsExporter implements Exporter {
         height: preset.height,
         frameRate: preset.fps,
       },
-      ...(includeAudio
-        ? { audio: { codec: "aac", numberOfChannels: 1, sampleRate: 48_000 } }
-        : {}),
+      ...(includeAudio ? { audio: { codec: "aac", numberOfChannels: 1, sampleRate: 48_000 } } : {}),
       fastStart: "in-memory",
       firstTimestampBehavior: "offset",
     });
@@ -73,7 +68,7 @@ export class WebCodecsExporter implements Exporter {
     const encoder = new VideoEncoder({
       output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
       error: (e) => {
-        // eslint-disable-next-line no-console
+        // biome-ignore lint/suspicious/noConsole: WebCodecs reports encoder failures via callbacks.
         console.error("Encoder error:", e);
       },
     });
@@ -156,7 +151,7 @@ export class WebCodecsExporter implements Exporter {
           const audioEncoder = new AudioEncoder({
             output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
             error: (e) => {
-              // eslint-disable-next-line no-console
+              // biome-ignore lint/suspicious/noConsole: WebCodecs reports encoder failures via callbacks.
               console.warn("Audio encoder error:", e);
             },
           });
@@ -187,7 +182,7 @@ export class WebCodecsExporter implements Exporter {
           audioEncoder.close();
         }
       } catch (err) {
-        // eslint-disable-next-line no-console
+        // biome-ignore lint/suspicious/noConsole: Export continues without audio and needs a diagnostic.
         console.warn("Audio export skipped:", err);
       }
     }
@@ -255,11 +250,20 @@ const sanitizeName = (s: string): string => s.replace(/[^a-z0-9_\-]+/gi, "_").sl
 // Electron preload bridge (native Save panel + filesystem write); on the
 // web we fall back to the standard anchor-download flow.
 export const downloadBlob = async (blob: Blob, filename: string): Promise<void> => {
-  const desktop = (
+  const desktop =
     typeof window !== "undefined"
-      ? (window as unknown as { cutDesktop?: { saveExport?: (p: { suggestedName: string; bytes: Uint8Array; mimeType?: string }) => Promise<string | null> } }).cutDesktop
-      : undefined
-  );
+      ? (
+          window as unknown as {
+            cutDesktop?: {
+              saveExport?: (p: {
+                suggestedName: string;
+                bytes: Uint8Array;
+                mimeType?: string;
+              }) => Promise<string | null>;
+            };
+          }
+        ).cutDesktop
+      : undefined;
   if (desktop?.saveExport) {
     const bytes = new Uint8Array(await blob.arrayBuffer());
     await desktop.saveExport({
