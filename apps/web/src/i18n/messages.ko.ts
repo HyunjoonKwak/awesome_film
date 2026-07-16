@@ -23,6 +23,10 @@ export const ko = {
     "collab.joinFailed": "참여 실패: {msg}",
     "collab.receiving": "{name} 받는 중",
     "collab.syncFailed": "미디어 동기화 실패",
+    "collab.serverMissing": "협업을 사용하려면 NEXT_PUBLIC_COLLAB_WS_URL을 설정하세요",
+    "collab.serverInvalid": "협업 서버 URL이 올바르지 않습니다",
+    "collab.serverInsecure": "원격 협업 서버는 wss://를 사용해야 합니다",
+    "collab.roomInvalid": "방 코드는 8–128자의 영문, 숫자, -, _만 사용할 수 있습니다",
 
     // Media bin
     "media.title": "미디어",

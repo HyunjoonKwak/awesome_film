@@ -23,6 +23,10 @@ export const en = {
     "collab.joinFailed": "Join failed: {msg}",
     "collab.receiving": "Receiving {name}",
     "collab.syncFailed": "Media sync failed",
+    "collab.serverMissing": "Set NEXT_PUBLIC_COLLAB_WS_URL to enable collaboration",
+    "collab.serverInvalid": "The collaboration server URL is invalid",
+    "collab.serverInsecure": "Remote collaboration servers must use wss://",
+    "collab.roomInvalid": "Room codes must be 8–128 letters, numbers, - or _",
 
     // Media bin
     "media.title": "Media",

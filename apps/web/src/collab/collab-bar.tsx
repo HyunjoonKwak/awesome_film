@@ -5,11 +5,10 @@ import { LogOut, Share2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useAwarenessStore } from "./awareness-store";
+import { configuredCollabServer, normalizeRoomCode } from "./collab-config";
 import { useCollabSessionStore } from "./collab-session-store";
 import { useMediaTransferStore } from "./media-transfer-store";
 import { getBridge } from "./yjs-bridge";
-
-const DEFAULT_WS = "wss://demos.yjs.dev"; // public test relay
 
 export function CollabBar() {
   const peers = useAwarenessStore((s) => s.peers);
@@ -24,8 +23,24 @@ export function CollabBar() {
 
   const join = () => {
     try {
-      getBridge().joinRoom(DEFAULT_WS, `cut-editor:${room}`);
-      toast.success(t("collab.joined", { room }));
+      const server = configuredCollabServer();
+      if (!server.ok) {
+        const key =
+          server.error === "missing"
+            ? "collab.serverMissing"
+            : server.error === "insecure"
+              ? "collab.serverInsecure"
+              : "collab.serverInvalid";
+        toast.error(t(key));
+        return;
+      }
+      const roomCode = normalizeRoomCode(room);
+      if (!roomCode) {
+        toast.error(t("collab.roomInvalid"));
+        return;
+      }
+      getBridge().joinRoom(server.url, `cut-editor:${roomCode}`);
+      toast.success(t("collab.joined", { room: roomCode }));
     } catch (err) {
       toast.error(
         t("collab.joinFailed", { msg: err instanceof Error ? err.message : String(err) }),

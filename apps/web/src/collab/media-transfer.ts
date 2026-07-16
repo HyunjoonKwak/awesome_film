@@ -26,6 +26,7 @@ interface MediaChunk {
   readonly totalBytes: number;
   readonly mimeType: string;
   readonly data: string;
+  readonly sha256: string;
   readonly done: boolean;
 }
 
@@ -108,6 +109,8 @@ export const isMediaChunk = (value: unknown): value is MediaChunk =>
   typeof value.mimeType === "string" &&
   typeof value.data === "string" &&
   value.data.length <= MAX_ENCODED_CHUNK_LENGTH &&
+  typeof value.sha256 === "string" &&
+  /^[a-f0-9]{64}$/.test(value.sha256) &&
   typeof value.done === "boolean";
 
 export const bytesToBase64 = (bytes: Uint8Array): string => {
@@ -121,6 +124,12 @@ export const base64ToBytes = (encoded: string): Uint8Array => {
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
   return bytes;
+};
+
+const sha256Hex = async (bytes: Uint8Array): Promise<string> => {
+  if (!globalThis.crypto?.subtle) throw new Error("SHA-256 is unavailable in this browser");
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", Uint8Array.from(bytes));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 };
 
 const isSafeMediaKey = (key: string): boolean =>
@@ -311,6 +320,9 @@ export const createMediaTransferManager = ({
         return;
       }
       const bytes = base64ToBytes(candidate.data);
+      if ((await sha256Hex(bytes)) !== candidate.sha256) {
+        throw new Error("Remote media chunk failed its SHA-256 integrity check");
+      }
       const nextOffset = candidate.offset + bytes.byteLength;
       if (
         bytes.byteLength > MEDIA_CHUNK_BYTES ||
@@ -437,6 +449,7 @@ export const createMediaTransferManager = ({
           totalBytes: blob.size,
           mimeType: blob.type || asset.mime,
           data: bytesToBase64(bytes),
+          sha256: await sha256Hex(bytes),
           done: end === blob.size,
         };
         awareness.setLocalStateField(CHUNK_FIELD, chunk);

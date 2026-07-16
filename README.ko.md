@@ -61,6 +61,13 @@ pnpm install
 pnpm dev          # http://localhost:3000
 ```
 
+실시간 협업은 릴레이 서버를 설정하기 전까지 비활성화됩니다.
+`apps/web/.env.example`을 `apps/web/.env.local`로 복사하고
+`NEXT_PUBLIC_COLLAB_WS_URL`에 자체 y-websocket 주소를 설정하세요. 원격 서버는
+`wss://`가 필수이며 로컬 개발에서는 `ws://localhost:1234`를 사용할 수 있습니다.
+데스크톱 릴리스 빌드는 GitHub Actions 저장소 변수 `COLLAB_WS_URL`에서 같은
+주소를 읽습니다.
+
 요구사항: Node 20+, pnpm 9+.
 
 ## macOS 앱으로 설치하기

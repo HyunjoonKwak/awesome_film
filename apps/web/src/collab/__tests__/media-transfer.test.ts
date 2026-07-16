@@ -13,9 +13,14 @@ import {
 class AwarenessBus {
   readonly states = new Map<number, Record<string, unknown>>();
   readonly clients = new Set<FakeAwareness>();
+  mutate: ((clientId: number, field: string, value: unknown) => unknown) | null = null;
 
   publish(client: FakeAwareness, field: string, value: unknown): void {
-    this.states.set(client.clientID, { ...this.states.get(client.clientID), [field]: value });
+    const published = this.mutate?.(client.clientID, field, value) ?? value;
+    this.states.set(client.clientID, {
+      ...this.states.get(client.clientID),
+      [field]: published,
+    });
     for (const peer of this.clients) peer.notify();
   }
 }
@@ -204,5 +209,43 @@ describe("media transfer protocol", () => {
     await waitFor(() => awareness.getLocalState().mediaRequest === null);
 
     manager.dispose();
+  });
+
+  it("rejects a chunk whose bytes do not match its SHA-256 digest", async () => {
+    const sourceFiles = new Map<string, Blob>([
+      [asset.opfsPath, new Blob([new Uint8Array([1, 2, 3]).buffer], { type: asset.mime })],
+    ]);
+    const targetFiles = new Map<string, Blob>();
+    const bus = new AwarenessBus();
+    bus.mutate = (clientId, field, value) => {
+      if (clientId !== 1 || field !== "mediaChunk" || !isMediaChunk(value)) return value;
+      return { ...value, data: bytesToBase64(new Uint8Array([9, 2, 3])) };
+    };
+    const sourceAwareness = new FakeAwareness(1, bus);
+    const targetAwareness = new FakeAwareness(2, bus);
+    let error: string | null = null;
+    const source = createMediaTransferManager({
+      awareness: sourceAwareness,
+      getProject: () => project,
+      storage: mapStorage(sourceFiles),
+      onProgress: () => {},
+      onError: () => {},
+    });
+    const target = createMediaTransferManager({
+      awareness: targetAwareness,
+      getProject: () => project,
+      storage: mapStorage(targetFiles),
+      onProgress: () => {},
+      onError: (message) => {
+        error = message;
+      },
+    });
+
+    await waitFor(() => error !== null);
+    expect(error).toContain("SHA-256");
+    expect(targetFiles.has(asset.opfsPath)).toBe(false);
+
+    source.dispose();
+    target.dispose();
   });
 });

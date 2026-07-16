@@ -62,6 +62,13 @@ pnpm install
 pnpm dev          # http://localhost:3000
 ```
 
+Realtime collaboration is intentionally disabled until a relay is configured.
+Copy `apps/web/.env.example` to `apps/web/.env.local` and set
+`NEXT_PUBLIC_COLLAB_WS_URL` to your own y-websocket endpoint. Remote endpoints
+must use `wss://`; local development may use `ws://localhost:1234`. Desktop
+releases read the same URL from the GitHub Actions repository variable
+`COLLAB_WS_URL`.
+
 Requirements: Node 20+, pnpm 9+.
 
 ## Install as an app on macOS
