@@ -136,6 +136,12 @@ importers:
       vitest:
         specifier: ^2.1.5
         version: 2.1.9(@types/node@22.19.19)
+      ws:
+        specifier: 8.18.3
+        version: 8.18.3
+      yjs-server:
+        specifier: 0.2.3
+        version: 0.2.3(lib0@0.2.117)(y-protocols@1.0.7(yjs@13.6.30))(yjs@13.6.30)
 
   packages/core:
     dependencies:
@@ -3542,6 +3548,18 @@ packages:
   wrappy@1.0.2:
     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
 
+  ws@8.18.3:
+    resolution: {integrity: sha512-PEIGCY5tSlUt50cqyMXfCzX+oOPqN0vuGqWzbcJ2xvnkzkq46oOpz7dQaTDBdfICb4N14+GARUDw2XV2N4tvzg==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+
   xmlbuilder@15.1.1:
     resolution: {integrity: sha512-yMqGBqtXyeN1e3TGYvgNgDVZ3j84W4cwkOXQswghol6APgZWaff9lnbvN7MHYJOiXsvGPXtjTYJEiC9J2wv9Eg==}
     engines: {node: '>=8.0'}
@@ -3589,6 +3607,14 @@ packages:
 
   yauzl@2.10.0:
     resolution: {integrity: sha512-p4a9I6X6nu6IhoGmBqAcbJy1mlC4j27vEPZX9F4L4/vZT3Lyq1VkFHw/V/PUcB9Buo+DG3iHkT0x3Qya58zc3g==}
+
+  yjs-server@0.2.3:
+    resolution: {integrity: sha512-cQTFu8s+7Un0OEOQpFZBVmAoWmLmdJ3RNEXzHjEEYyjH3xvyWYWw6hzYfwKs1E4omcSjtHFJwy4RtmT0ZlH1oA==}
+    engines: {node: '>=14.16'}
+    peerDependencies:
+      lib0: ^0.2
+      y-protocols: ^1.0.5
+      yjs: '>= 12'
 
   yjs@13.6.30:
     resolution: {integrity: sha512-vv/9h42eCMC81ZHDFswuu/MKzkl/vyq1BhaNGfHyOonwlG4CJbQF4oiBBJPvfdeCt/PlVDWh7Nov9D34YY09uQ==}
@@ -7054,6 +7080,8 @@ snapshots:
 
   wrappy@1.0.2: {}
 
+  ws@8.18.3: {}
+
   xmlbuilder@15.1.1: {}
 
   y-indexeddb@9.0.12(yjs@13.6.30):
@@ -7096,6 +7124,12 @@ snapshots:
     dependencies:
       buffer-crc32: 0.2.13
       fd-slicer: 1.1.0
+
+  yjs-server@0.2.3(lib0@0.2.117)(y-protocols@1.0.7(yjs@13.6.30))(yjs@13.6.30):
+    dependencies:
+      lib0: 0.2.117
+      y-protocols: 1.0.7(yjs@13.6.30)
+      yjs: 13.6.30
 
   yjs@13.6.30:
     dependencies:

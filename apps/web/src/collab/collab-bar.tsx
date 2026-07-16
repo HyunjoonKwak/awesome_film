@@ -2,7 +2,7 @@
 
 import { useT } from "@/i18n/use-t";
 import { LogOut, Share2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAwarenessStore } from "./awareness-store";
 import { configuredCollabServer, normalizeRoomCode } from "./collab-config";
@@ -13,6 +13,7 @@ import { getBridge } from "./yjs-bridge";
 export function CollabBar() {
   const peers = useAwarenessStore((s) => s.peers);
   const joinedRoom = useCollabSessionStore((state) => state.room);
+  const connectionStatus = useCollabSessionStore((state) => state.status);
   const transfer = useMediaTransferStore((state) => state.progress);
   const transferError = useMediaTransferStore((state) => state.error);
   // Random per-session room instead of a shared public one, so clicking Share
@@ -20,6 +21,14 @@ export function CollabBar() {
   // this generated code out-of-band with whoever should join.
   const [room, setRoom] = useState(() => `cut-${crypto.randomUUID()}`);
   const t = useT();
+  const previousStatus = useRef(connectionStatus);
+
+  useEffect(() => {
+    if (connectionStatus === "connected" && previousStatus.current !== "connected" && joinedRoom) {
+      toast.success(t("collab.joined", { room: joinedRoom.replace(/^cut-editor:/, "") }));
+    }
+    previousStatus.current = connectionStatus;
+  }, [connectionStatus, joinedRoom, t]);
 
   const join = () => {
     try {
@@ -40,7 +49,6 @@ export function CollabBar() {
         return;
       }
       getBridge().joinRoom(server.url, `cut-editor:${roomCode}`);
-      toast.success(t("collab.joined", { room: roomCode }));
     } catch (err) {
       toast.error(
         t("collab.joinFailed", { msg: err instanceof Error ? err.message : String(err) }),
@@ -88,21 +96,32 @@ export function CollabBar() {
           ))}
       </div>
       {joinedRoom ? (
-        <button
-          type="button"
-          onClick={leave}
-          className="btn-ghost px-2 py-1 text-xs"
-          title={t("collab.leave")}
-        >
-          <LogOut className="size-3.5" />
-          {t("collab.leave")}
-        </button>
+        <>
+          <span
+            className="text-3xs text-ink-2"
+            data-testid="collab-status"
+            data-status={connectionStatus}
+            aria-live="polite"
+          >
+            {t(`collab.${connectionStatus}`)}
+          </span>
+          <button
+            type="button"
+            onClick={leave}
+            className="btn-ghost px-2 py-1 text-xs"
+            title={t("collab.leave")}
+          >
+            <LogOut className="size-3.5" />
+            {t("collab.leave")}
+          </button>
+        </>
       ) : (
         <>
           <input
             value={room}
             onChange={(e) => setRoom(e.target.value)}
             placeholder={t("collab.room")}
+            aria-label={t("collab.room")}
             className="w-24 rounded bg-white/5 px-2 py-1 text-xs text-ink-1 outline-none focus:bg-white/10"
           />
           <button

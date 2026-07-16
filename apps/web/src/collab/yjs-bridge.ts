@@ -161,6 +161,9 @@ export const getBridge = (): CollabBridge => {
   });
 
   let ws: WebsocketProvider | null = null;
+  let statusSync:
+    | ((event: { status: "connected" | "disconnected" | "connecting" }) => void)
+    | null = null;
   const peerSync = () => {
     if (!ws) {
       useAwarenessStore.getState().setPeers(new Map());
@@ -198,42 +201,46 @@ export const getBridge = (): CollabBridge => {
     });
   };
 
+  const destroyProvider = () => {
+    if (!ws) return;
+    mediaTransfer?.dispose();
+    mediaTransfer = null;
+    ws.awareness.off("change", peerSync);
+    if (statusSync) ws.off("status", statusSync);
+    statusSync = null;
+    unsubscribeCursor?.();
+    unsubscribeCursor = null;
+    ws.destroy();
+    ws = null;
+    if (bridge) bridge.ws = null;
+  };
+
   const joinRoom = (server: string, room: string) => {
-    if (ws) {
-      mediaTransfer?.dispose();
-      mediaTransfer = null;
-      ws.awareness.off("change", peerSync);
-      unsubscribeCursor?.();
-      unsubscribeCursor = null;
-      ws.destroy();
-    }
-    ws = new WebsocketProvider(server, room, doc);
+    destroyProvider();
+    useCollabSessionStore.getState().setConnection(room, "connecting");
+    const provider = new WebsocketProvider(server, room, doc);
+    ws = provider;
+    statusSync = ({ status }) => {
+      if (disposed || ws !== provider) return;
+      useCollabSessionStore.getState().setStatus(status);
+    };
+    provider.on("status", statusSync);
     mediaTransfer = createMediaTransferManager({
-      awareness: ws.awareness,
+      awareness: provider.awareness,
       getProject: () => useProjectStore.getState().project,
     });
     broadcastCursor();
-    ws.awareness.on("change", peerSync);
+    provider.awareness.on("change", peerSync);
     unsubscribeCursor = useProjectStore.subscribe(
       (state) => state.project.timeline.playhead,
       () => broadcastCursor(),
     );
-    useCollabSessionStore.getState().setRoom(room);
     if (bridge) bridge.ws = ws;
   };
 
   const leaveRoom = () => {
-    if (ws) {
-      mediaTransfer?.dispose();
-      mediaTransfer = null;
-      ws.awareness.off("change", peerSync);
-      unsubscribeCursor?.();
-      unsubscribeCursor = null;
-      ws.destroy();
-      ws = null;
-      if (bridge) bridge.ws = null;
-    }
-    useCollabSessionStore.getState().setRoom(null);
+    destroyProvider();
+    useCollabSessionStore.getState().setConnection(null, "disconnected");
     useAwarenessStore.getState().setPeers(new Map());
   };
 

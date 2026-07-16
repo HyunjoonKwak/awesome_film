@@ -2,11 +2,15 @@
 
 import { create } from "zustand";
 
+type CollabConnectionStatus = "disconnected" | "connecting" | "connected";
+
 interface CollabSessionState {
   hydrated: boolean;
   room: string | null;
+  status: CollabConnectionStatus;
   setHydrated: (hydrated: boolean) => void;
-  setRoom: (room: string | null) => void;
+  setConnection: (room: string | null, status: CollabConnectionStatus) => void;
+  setStatus: (status: CollabConnectionStatus) => void;
 }
 
 // UI-facing lifecycle state kept outside the Y.Doc. In particular, changing
@@ -15,6 +19,8 @@ interface CollabSessionState {
 export const useCollabSessionStore = create<CollabSessionState>((set) => ({
   hydrated: false,
   room: null,
+  status: "disconnected",
   setHydrated: (hydrated) => set({ hydrated }),
-  setRoom: (room) => set({ room }),
+  setConnection: (room, status) => set({ room, status }),
+  setStatus: (status) => set({ status }),
 }));

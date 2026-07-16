@@ -6,6 +6,7 @@
         "src/app/**/{page,layout,loading,error,not-found,route}.tsx",
         "src/app/**/{page,layout,loading,error,not-found,route}.ts",
         "next.config.{js,mjs,ts}",
+        "scripts/e2e-collab-server.mjs",
         "src/**/*.test.{ts,tsx}",
         "public/sw.js",
         "public/plugins/*.js"
