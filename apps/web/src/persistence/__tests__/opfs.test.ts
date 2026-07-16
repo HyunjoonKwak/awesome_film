@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { createMediaFileWriter, deleteMediaFile, readMediaFile } from "../opfs";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { acquireMediaUrl, createMediaFileWriter, deleteMediaFile, readMediaFile } from "../opfs";
 
 const keys: string[] = [];
 
@@ -32,5 +32,24 @@ describe("incremental media writer", () => {
     await writer.abort();
 
     expect(await readMediaFile(key)).toBeNull();
+  });
+
+  it("revokes a shared object URL when its final lease is released", async () => {
+    const key = `stream-${crypto.randomUUID()}`;
+    keys.push(key);
+    const writer = await createMediaFileWriter(key, "video/test");
+    await writer.write(0, new Uint8Array([1, 2, 3]));
+    await writer.close();
+    const revoke = vi.spyOn(URL, "revokeObjectURL");
+
+    const first = await acquireMediaUrl(key);
+    const second = await acquireMediaUrl(key);
+    expect(first?.url).toBe(second?.url);
+    first?.release();
+    expect(revoke).not.toHaveBeenCalled();
+    second?.release();
+    expect(revoke).toHaveBeenCalledOnce();
+
+    revoke.mockRestore();
   });
 });

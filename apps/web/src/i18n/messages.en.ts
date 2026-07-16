@@ -29,6 +29,7 @@ export const en = {
     "collab.serverMissing": "Set NEXT_PUBLIC_COLLAB_WS_URL to enable collaboration",
     "collab.serverInvalid": "The collaboration server URL is invalid",
     "collab.serverInsecure": "Remote collaboration servers must use wss://",
+    "collab.ticketMissing": "Set NEXT_PUBLIC_COLLAB_TICKET_URL for authenticated remote collaboration",
     "collab.roomInvalid": "Room codes must be 8–128 letters, numbers, - or _",
 
     // Media bin

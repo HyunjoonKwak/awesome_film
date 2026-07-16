@@ -53,7 +53,7 @@ export const upsertProject = async (p: Project): Promise<void> => {
 type StoredProjectLoadResult =
   | { readonly status: "ok"; readonly project: Project }
   | { readonly status: "missing" }
-  | { readonly status: "corrupt" };
+  | { readonly status: "corrupt"; readonly raw: string };
 
 export const loadStoredProject = async (id: string): Promise<StoredProjectLoadResult> => {
   const row = await getDb().projects.get(id);
@@ -61,9 +61,9 @@ export const loadStoredProject = async (id: string): Promise<StoredProjectLoadRe
   try {
     return { status: "ok", project: parseStoredProject(JSON.parse(row.json)) };
   } catch {
-    // Keep the row so users can still export/recover its raw IndexedDB data or
-    // explicitly delete it from the project menu.
-    return { status: "corrupt" };
+    // Keep the raw JSON so callers (e.g. media GC) can salvage OPFS references
+    // and users can still export/recover or delete it from the project menu.
+    return { status: "corrupt", raw: row.json };
   }
 };
 

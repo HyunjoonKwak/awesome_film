@@ -99,10 +99,12 @@ bounded chunks with SHA-256 validation and retry/resume behavior.
 ## Export
 
 The exporter advances a virtual playhead through the same compositor and feeds
-frames to WebCodecs. Audio assets are decoded at 48 kHz, resampled per clip,
-processed per stereo channel, mixed with shared ducking/limiting gains, and
-encoded as planar stereo AAC. Optional work ranges and LUFS normalization are
-applied before muxing.
+frames to WebCodecs. Audio assets are decoded through a two-entry LRU and mixed
+in bounded 30-second chunks at 48 kHz. Per-clip effects receive overlap padding;
+ducking state and streaming LUFS filter state continue across chunk boundaries.
+Chunks are encoded directly as planar stereo AAC, so PCM memory does not grow
+with timeline duration. Optional work ranges and normalization are applied
+before muxing.
 
 ## Quality gates
 

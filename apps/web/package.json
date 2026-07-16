@@ -7,11 +7,12 @@
     "dev": "next dev --turbopack -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
-    "lint": "biome lint src e2e playwright.config.ts",
+    "lint": "biome lint src e2e scripts/collab-*.mjs playwright.config.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run && node --test scripts/collab-auth.test.mjs scripts/collab-relay.test.mjs",
     "test:e2e": "playwright test",
-    "format": "biome format --write src e2e playwright.config.ts",
+    "collab:relay": "node scripts/collab-relay.mjs",
+    "format": "biome format --write src e2e scripts/collab-*.mjs playwright.config.ts",
     "knip": "pnpm --dir ../.. exec knip --workspace apps/web",
     "prebundle:whisper": "node scripts/download-whisper.mjs"
   },
@@ -26,16 +27,18 @@
     "lucide-react": "^0.460.0",
     "mp4-muxer": "^5.2.2",
     "mp4box": "^2.3.0",
-    "next": "^15.0.3",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "next": "^15.5.18",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "react-resizable-panels": "^2.1.9",
     "sonner": "^1.7.0",
     "tailwind-merge": "^2.5.4",
+    "ws": "8.18.3",
     "y-indexeddb": "^9.0.12",
     "y-protocols": "^1.0.7",
     "y-websocket": "^3.0.0",
     "yjs": "^13.6.30",
+    "yjs-server": "0.2.3",
     "zod": "^3.23.8",
     "zustand": "^5.0.1"
   },
@@ -48,8 +51,6 @@
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.14",
     "typescript": "^5.6.3",
-    "vitest": "^2.1.5",
-    "ws": "8.18.3",
-    "yjs-server": "0.2.3"
+    "vitest": "^2.1.5"
   }
 }

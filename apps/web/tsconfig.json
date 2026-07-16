@@ -20,7 +20,8 @@
     "src/**/*.tsx",
     "e2e/**/*.ts",
     "playwright.config.ts",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+    ".next-ci/types/**/*.ts"
   ],
   "exclude": ["node_modules"]
 }

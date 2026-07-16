@@ -2,7 +2,7 @@
 // unavailable (Firefox private, older Safari, etc.).
 
 const inMemory = new Map<string, Blob>();
-const objectUrls = new Map<string, string>();
+const objectUrls = new Map<string, { url: string; references: number }>();
 
 const supportsOpfs = () =>
   typeof navigator !== "undefined" && "storage" in navigator && "getDirectory" in navigator.storage;
@@ -12,11 +12,16 @@ const getRoot = async (): Promise<FileSystemDirectoryHandle> => {
 };
 
 const revokeMediaUrl = (key: string): void => {
-  const url = objectUrls.get(key);
-  if (!url) return;
-  URL.revokeObjectURL(url);
+  const entry = objectUrls.get(key);
+  if (!entry) return;
+  URL.revokeObjectURL(entry.url);
   objectUrls.delete(key);
 };
+
+export interface MediaUrlLease {
+  readonly url: string;
+  release(): void;
+}
 
 export interface MediaFileWriter {
   write: (offset: number, data: Uint8Array) => Promise<void>;
@@ -113,14 +118,27 @@ export const readMediaFile = async (key: string): Promise<Blob | null> => {
   }
 };
 
-export const getMediaUrl = async (key: string): Promise<string | null> => {
-  const cached = objectUrls.get(key);
-  if (cached) return cached;
-  const blob = await readMediaFile(key);
-  if (!blob) return null;
-  const url = URL.createObjectURL(blob);
-  objectUrls.set(key, url);
-  return url;
+export const acquireMediaUrl = async (key: string): Promise<MediaUrlLease | null> => {
+  let entry = objectUrls.get(key);
+  if (!entry) {
+    const blob = await readMediaFile(key);
+    if (!blob) return null;
+    entry = { url: URL.createObjectURL(blob), references: 0 };
+    objectUrls.set(key, entry);
+  }
+  entry.references++;
+  let released = false;
+  return {
+    url: entry.url,
+    release: () => {
+      if (released) return;
+      released = true;
+      const current = objectUrls.get(key);
+      if (!current || current.url !== entry.url) return;
+      current.references--;
+      if (current.references <= 0) revokeMediaUrl(key);
+    },
+  };
 };
 
 export const deleteMediaFile = async (key: string): Promise<void> => {

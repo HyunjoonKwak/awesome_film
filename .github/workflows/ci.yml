@@ -38,18 +38,26 @@ jobs:
       # Each step runs across every workspace package. Ordered cheapest-first
       # so the fastest signal (lint) fails the run before the slower gates.
       - name: Lint
-        run: pnpm -r lint
+        run: pnpm lint
 
       - name: Typecheck
-        run: pnpm -r typecheck
+        run: pnpm typecheck
 
       - name: Test
-        run: pnpm -r test
+        run: pnpm test
+
+      - name: Audit production dependencies (OSV)
+        run: pnpm audit:prod
 
       # Production build catches Next/RSC issues that tsc alone misses. The
       # static Electron export + .dmg packaging still live in release.yml.
       - name: Build (web production)
         run: pnpm --filter @cut/web build
+        env:
+          # `next dev --turbopack` runs immediately afterward for Playwright.
+          # Production and development caches are incompatible, so keep the
+          # build output away from the dev server's standard `.next` tree.
+          NEXT_DIST_DIR: .next-ci
 
       - name: Install Playwright Chromium
         run: pnpm --filter @cut/web exec playwright install --with-deps chromium

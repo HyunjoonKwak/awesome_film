@@ -10,10 +10,7 @@
         "public/sw.js",
         "public/plugins/*.js"
       ],
-      "project": ["src/**/*.{ts,tsx}"],
-      "ignore": [
-        "src/effects/plugin-registry.ts"
-      ]
+      "project": ["src/**/*.{ts,tsx}"]
     },
     "apps/desktop": {
       "project": ["src/**/*.cjs"],

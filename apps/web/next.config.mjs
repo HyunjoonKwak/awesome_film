@@ -3,6 +3,10 @@ const isExport = process.env.NEXT_OUTPUT === "export";
 
 const nextConfig = {
   reactStrictMode: true,
+  // Playwright starts a Turbopack dev server after the production build in CI.
+  // Keep those incompatible caches separate so the dev server never tries to
+  // reuse a production `.next` tree.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   transpilePackages: ["@cut/core"],
   // The desktop bundle ships a static `out/` directory served by Electron;
   // web deploys keep the standard `next start` flow with header support.

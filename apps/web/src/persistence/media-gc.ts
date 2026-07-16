@@ -27,6 +27,29 @@ const collectKeys = (p: Project, keep: Set<string>): void => {
   }
 };
 
+// Best-effort extraction of opfsPath/proxyPath values from raw project JSON we
+// couldn't parse, so GC preserves media a corrupt-but-recoverable project still
+// references instead of reaping it.
+const salvageMediaKeys = (raw: string, keep: Set<string>): void => {
+  // Match the full JSON string literal (including escapes) then JSON.parse it,
+  // so a filename containing a quote or backslash isn't truncated into a wrong
+  // key that could get a still-referenced file reaped.
+  const re = /"(?:opfsPath|proxyPath)"\s*:\s*("(?:\\.|[^"\\])*")/g;
+  let match = re.exec(raw);
+  while (match !== null) {
+    const captured = match[1];
+    if (captured) {
+      try {
+        const key = JSON.parse(captured) as string;
+        if (key) keep.add(key);
+      } catch {
+        // Malformed escape — skip this candidate rather than risk a wrong key.
+      }
+    }
+    match = re.exec(raw);
+  }
+};
+
 // Reclaim OPFS blobs (originals + proxies) that no project references — the
 // current in-memory project plus every project saved in the library. Media
 // deletion is metadata-only (see media-bin), so this is what actually frees
@@ -39,9 +62,14 @@ export const collectMediaGarbage = async (current: Project): Promise<number> => 
   collectKeys(current, keep);
   for (const row of await listProjectsLibrary()) {
     const result = await loadStoredProject(row.id);
-    // A damaged row may still contain recoverable media references. Abort the
-    // destructive pass instead of guessing which OPFS blobs are orphaned.
-    if (result.status === "corrupt") return 0;
+    // A damaged row can't be parsed, but salvage any OPFS-key-shaped strings
+    // from its raw JSON so a recoverable project's media is never reaped — and
+    // keep scanning instead of aborting the whole pass forever (one corrupt row
+    // used to disable GC permanently).
+    if (result.status === "corrupt") {
+      salvageMediaKeys(result.raw, keep);
+      continue;
+    }
     if (result.status === "ok") collectKeys(result.project, keep);
   }
 

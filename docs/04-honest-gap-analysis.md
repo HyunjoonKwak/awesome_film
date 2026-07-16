@@ -10,12 +10,12 @@ Legend: ✅ shipped • 🟡 partial / needs work • ❌ missing
 | Capability | Status | Notes |
 | -- | :--: | -- |
 | H.264 MP4 export (WebCodecs) | ✅ | 4 presets (YT 1080p/4K, TikTok 9:16, Web VP9) |
-| Audio mixing into export | ✅ | Per-channel effects + worker mix + stereo AAC |
+| Audio mixing into export | ✅ | Bounded chunks, per-channel effects, worker mix, stereo AAC |
 | Clip transform applied (pos/scale/rot) | ✅ | Vertex-shader affine transform, keyframe overrides (`compositor.ts`) |
 | Transitions rendered | ✅ | fade/dissolve/dip/slide/zoom/spin + GPU wipe mask |
 | Effect keyframe interpolation in export | ✅ | Compositor samples per-frame |
 | Export progress + cancel button | ✅ | Progress, fps, ETA, working cancel |
-| Loudness normalization | ✅ | LUFS measure + normalize |
+| Loudness normalization | ✅ | Stateful streaming LUFS measure + two-pass normalize |
 | Stereo export | ✅ | Mono sources duplicate; stereo sources preserve L/R through planar AAC |
 | Lossless / proxy export | ❌ | One quality per preset |
 | GIF / image-sequence export | ❌ | |
@@ -91,24 +91,31 @@ Legend: ✅ shipped • 🟡 partial / needs work • ❌ missing
 ## What actually remains — the real backlog (2026-07-16)
 
 The load-bearing reliability backlog identified in the earlier audit is closed:
-CI runs lint/typecheck/unit/build/browser tests; persistence is validated and
-corruption-safe; renderer caches are bounded; collaboration has real two-browser
-CRDT and binary-transfer coverage; and export preserves stereo.
+CI runs lint/typecheck/unit/build/browser tests plus an OSV production dependency
+audit; persistence is validated and corruption-safe; renderer caches are bounded;
+collaboration has real two-browser CRDT and binary-transfer coverage; and export
+preserves stereo. The final OSV pass checked 179 production packages with zero
+known vulnerabilities.
 
-The remaining items are product expansion or performance polish:
+The remaining items are product expansion, maintenance, or performance polish:
 
-1. **Broader interaction coverage.** There are 119 unit tests plus three
-   Playwright flows, but complex drag/trim/mask/multicam UI interactions and AI
-   cancellation paths still rely mainly on manual testing.
+1. **Broader interaction coverage.** 132 automated unit/protocol tests plus
+   three Playwright flows pass, but complex drag/trim/mask/multicam UI
+   interactions and AI cancellation paths still rely mainly on manual testing.
 2. **AI analysis speed.** Scene detection and motion tracking still seek a
    media element serially instead of sharing the WebCodecs decoder.
 3. **Main-thread rendering.** The compositor is bounded but remains on the main
    thread; an OffscreenCanvas worker or WebGPU backend is future work.
 4. **Feature expansion.** Per-language subtitle tracks/translation, effect
    preview thumbnails, GIF/image-sequence export, and compound sequences.
-5. **Operational hardening.** A production collaboration deployment still
-   needs an authenticated, rate-limited relay; the repository only configures
-   the client and a local test relay.
+5. **Identity integration.** The repository now includes a ticket-authenticated,
+   rate-limited production relay and the client fails closed without a ticket
+   endpoint. A deployment still has to connect ticket issuance to its own user
+   identity and room authorization policy.
+6. **Dependency maintenance.** `mp4-muxer` is deprecated upstream and should
+   eventually move to its maintained successor. MediaPipe also emits a dynamic
+   dependency warning during bundling. Both current paths build and package
+   successfully; neither is a present runtime blocker.
 
 Everything flows through the same immutable command pipeline, so undo/redo and
 collaboration stay free as these land.

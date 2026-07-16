@@ -24,13 +24,21 @@ describe("media GC with damaged project storage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.listProjectsLibrary.mockResolvedValue([{ id: "damaged" }]);
-    mocks.loadStoredProject.mockResolvedValue({ status: "corrupt" });
-    mocks.listMediaKeys.mockResolvedValue(["possibly-recoverable.mov"]);
+    // A corrupt row still yields its raw JSON so GC can salvage the OPFS
+    // references a recoverable project uses.
+    mocks.loadStoredProject.mockResolvedValue({
+      status: "corrupt",
+      raw: JSON.stringify({ mediaLibrary: [{ opfsPath: "possibly-recoverable.mov" }] }),
+    });
+    mocks.listMediaKeys.mockResolvedValue(["possibly-recoverable.mov", "true-orphan.mov"]);
   });
 
-  it("aborts without deleting media referenced by recoverable raw data", async () => {
-    await expect(collectMediaGarbage(createEmptyProject())).resolves.toBe(0);
-    expect(mocks.listMediaKeys).not.toHaveBeenCalled();
-    expect(mocks.deleteMediaFile).not.toHaveBeenCalled();
+  it("preserves media a corrupt project references but still reclaims real orphans", async () => {
+    await collectMediaGarbage(createEmptyProject());
+    // Salvaged from the corrupt row's raw JSON — must NOT be deleted.
+    expect(mocks.deleteMediaFile).not.toHaveBeenCalledWith("possibly-recoverable.mov");
+    // A genuine orphan is still reclaimed: one corrupt row no longer disables
+    // GC entirely (the bug this fix targets).
+    expect(mocks.deleteMediaFile).toHaveBeenCalledWith("true-orphan.mov");
   });
 });

@@ -40,10 +40,10 @@ plugin SDK.
 | Text | Canvas2D-rendered text clips with size/color/bg controls + a dedicated subtitles track |
 | Media | OPFS-backed assets, thumbnail/waveform probe, drag-drop ingest |
 | AI (all local) | Auto silence cut (WebAudio RMS), Whisper transcription (HuggingFace), Scene detect (χ²), Background removal (MediaPipe Selfie) |
-| Export | WebCodecs H.264/VP9/AV1 + stereo AAC mixer, LUFS normalization, work ranges, four presets |
+| Export | WebCodecs H.264/VP9/AV1 + chunked stereo AAC mixer, streaming LUFS normalization, work ranges, four presets |
 | Persistence | Validated project library + snapshots, Yjs/IndexedDB state, OPFS media, corruption-safe recovery |
-| Collaboration | Configurable y-websocket rooms, connection state, CRDT edits, awareness, peer media transfer |
-| Plugin SDK | `window.cutEditor.registerEffect` + `registerShader`, load-by-URL via `localStorage["cut.plugins"]` |
+| Collaboration | Ticket-authenticated y-websocket rooms, validated CRDT edits, awareness, peer media transfer |
+| Plugin SDK | URL-loaded v2 effects in network-isolated sandbox iframes with declarative uniforms |
 | Mobile | Reactive shell with drawer panels + two-finger pinch zoom |
 
 ## Repo layout
@@ -65,10 +65,13 @@ pnpm dev          # http://localhost:3000
 
 Realtime collaboration is intentionally disabled until a relay is configured.
 Copy `apps/web/.env.example` to `apps/web/.env.local` and set
-`NEXT_PUBLIC_COLLAB_WS_URL` to your own y-websocket endpoint. Remote endpoints
-must use `wss://`; local development may use `ws://localhost:1234`. Desktop
-releases read the same URL from the GitHub Actions repository variable
-`COLLAB_WS_URL`.
+`NEXT_PUBLIC_COLLAB_WS_URL` to your relay. Remote endpoints must use `wss://`
+and also require `NEXT_PUBLIC_COLLAB_TICKET_URL`; local development may use
+`ws://localhost:1234` without tickets. The included production relay verifies
+short-lived room tickets and applies Origin/payload/rate limits. See
+[`docs/05-collaboration-deployment.md`](docs/05-collaboration-deployment.md).
+Desktop releases read the relay and ticket URLs from the GitHub Actions
+repository variables `COLLAB_WS_URL` and `COLLAB_TICKET_URL`.
 
 Requirements: Node 20+, pnpm 9+.
 
@@ -173,13 +176,13 @@ required.
 
 ## Roadmap (post v0.1)
 
-- WebGPU renderer (wgsl shaders, plugin SDK v2)
+- WebGPU renderer and WGSL shader support
 - Compound / nested sequences
 - Background render queue
 - Per-language subtitle tracks and translation workflow
 - Effect preview thumbnails and GIF / image-sequence export
 - Mobile native shells (Capacitor)
-- Plugin marketplace + sandboxed iframes
+- Signed plugin registry / marketplace
 
 ### Deferred (assessed, not yet shipped)
 
