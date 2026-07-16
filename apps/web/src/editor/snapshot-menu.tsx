@@ -41,6 +41,8 @@ export function SnapshotMenu() {
       loadProject(snap);
       setOpen(false);
       toast.success(t("snap.restored"));
+    } else {
+      toast.error(t("snap.corrupt"));
     }
   };
 

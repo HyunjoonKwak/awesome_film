@@ -5,6 +5,7 @@ import { downloadProjectJson, parseProjectExport } from "@/persistence/project-e
 import {
   deleteStoredProject,
   listProjectsLibrary,
+  loadStoredProject,
   setActiveProjectId,
   upsertProject,
 } from "@/persistence/project-library";
@@ -98,14 +99,19 @@ export function ProjectMenu() {
   };
 
   const onOpen = async (id: string) => {
-    const all = await listProjectsLibrary();
-    const row = all.find((r) => r.id === id);
-    if (!row) return;
-    const loaded = JSON.parse(row.json) as Project;
-    loadProject(loaded);
+    const result = await loadStoredProject(id);
+    if (result.status === "corrupt") {
+      toast.error(t("project.corrupt"));
+      return;
+    }
+    if (result.status === "missing") {
+      await refresh();
+      return;
+    }
+    loadProject(result.project);
     await setActiveProjectId(id);
     setOpen(false);
-    toast.success(t("project.opened", { name: row.name }));
+    toast.success(t("project.opened", { name: result.project.name }));
   };
 
   const onDelete = async (id: string) => {

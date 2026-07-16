@@ -1,6 +1,6 @@
 import type { Project } from "@cut/core";
 import { deleteMediaFile, listMediaKeys } from "./opfs";
-import { getProject, listProjectsLibrary } from "./project-library";
+import { listProjectsLibrary, loadStoredProject } from "./project-library";
 
 const mediaLeases = new Map<string, number>();
 
@@ -38,8 +38,11 @@ export const collectMediaGarbage = async (current: Project): Promise<number> => 
   const keep = new Set<string>();
   collectKeys(current, keep);
   for (const row of await listProjectsLibrary()) {
-    const p = await getProject(row.id);
-    if (p) collectKeys(p, keep);
+    const result = await loadStoredProject(row.id);
+    // A damaged row may still contain recoverable media references. Abort the
+    // destructive pass instead of guessing which OPFS blobs are orphaned.
+    if (result.status === "corrupt") return 0;
+    if (result.status === "ok") collectKeys(result.project, keep);
   }
 
   let removed = 0;

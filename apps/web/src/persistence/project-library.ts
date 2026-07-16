@@ -6,12 +6,13 @@
 
 import Dexie, { type Table } from "dexie";
 import type { Project } from "@cut/core";
+import { parseStoredProject } from "./project-export";
 
 interface StoredProject {
   id: string;
   name: string;
   updatedAt: number;
-  json: string;        // serialized Project to avoid Dexie struct quirks
+  json: string; // serialized Project to avoid Dexie struct quirks
 }
 
 interface MetaRow {
@@ -49,9 +50,21 @@ export const upsertProject = async (p: Project): Promise<void> => {
   });
 };
 
-export const getProject = async (id: string): Promise<Project | null> => {
+type StoredProjectLoadResult =
+  | { readonly status: "ok"; readonly project: Project }
+  | { readonly status: "missing" }
+  | { readonly status: "corrupt" };
+
+export const loadStoredProject = async (id: string): Promise<StoredProjectLoadResult> => {
   const row = await getDb().projects.get(id);
-  return row ? (JSON.parse(row.json) as Project) : null;
+  if (!row) return { status: "missing" };
+  try {
+    return { status: "ok", project: parseStoredProject(JSON.parse(row.json)) };
+  } catch {
+    // Keep the row so users can still export/recover its raw IndexedDB data or
+    // explicitly delete it from the project menu.
+    return { status: "corrupt" };
+  }
 };
 
 export const deleteStoredProject = async (id: string): Promise<void> => {

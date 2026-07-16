@@ -107,27 +107,46 @@ const mediaAssetSchema = z
   })
   .passthrough();
 
-const exportSchema = z.object({
-  schema: z.literal("cut_editor-project"),
-  version: z.number().int(),
-  exportedAt: z.number().int(),
-  project: z.object({
+const markerSchema = z
+  .object({
+    id: z.string().min(1),
+    at: nonNegative,
+    endMs: nonNegative.optional(),
+    label: z.string(),
+    color: z.string().min(1),
+  })
+  .passthrough();
+
+const projectSchema = z
+  .object({
     id: z.string(),
     name: z.string(),
     createdAt: z.number(),
     updatedAt: z.number(),
     framerate: positive,
-    resolution: z.object({ w: positive, h: positive }),
-    timeline: z.object({
-      tracks: z.array(trackSchema),
-      playhead: nonNegative,
-      zoom: positive,
-      magnetic: z.boolean(),
-      duration: nonNegative,
-    }),
+    resolution: z.object({ w: positive, h: positive }).passthrough(),
+    timeline: z
+      .object({
+        tracks: z.array(trackSchema),
+        playhead: nonNegative,
+        zoom: positive,
+        magnetic: z.boolean(),
+        duration: nonNegative,
+        markers: z.array(markerSchema).optional(),
+      })
+      .passthrough(),
     mediaLibrary: z.array(mediaAssetSchema),
-  }) as unknown as z.ZodType<Project>,
+  })
+  .passthrough() as unknown as z.ZodType<Project>;
+
+const exportSchema = z.object({
+  schema: z.literal("cut_editor-project"),
+  version: z.number().int(),
+  exportedAt: z.number().int(),
+  project: projectSchema,
 });
+
+export const parseStoredProject = (raw: unknown): Project => projectSchema.parse(raw);
 
 export const toProjectExport = (project: Project): ProjectExport => ({
   schema: "cut_editor-project",

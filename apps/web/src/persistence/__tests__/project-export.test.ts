@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createEmptyProject } from "@cut/core";
-import { parseProjectExport, toProjectExport } from "../project-export";
+import { createEmptyProject, newId } from "@cut/core";
+import { parseProjectExport, parseStoredProject, toProjectExport } from "../project-export";
 
 // The JSON export is the user's escape hatch for their work — a lossy or
 // crash-prone round-trip is silent data loss. These guard both directions.
@@ -97,5 +97,26 @@ describe("project-export", () => {
       },
     };
     expect(() => parseProjectExport(corrupt)).toThrow();
+  });
+
+  it("validates stored library projects and preserves timeline markers", () => {
+    const project = createEmptyProject({
+      timeline: {
+        ...createEmptyProject().timeline,
+        markers: [{ id: newId(), at: 250, label: "Beat", color: "#ff0000" }],
+      },
+    });
+
+    expect(parseStoredProject(JSON.parse(JSON.stringify(project)))).toEqual(project);
+  });
+
+  it("rejects malformed stored library projects before they reach the editor", () => {
+    const project = createEmptyProject();
+    expect(() =>
+      parseStoredProject({
+        ...project,
+        timeline: { ...project.timeline, tracks: "not-an-array" },
+      }),
+    ).toThrow();
   });
 });

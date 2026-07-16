@@ -1,6 +1,7 @@
 "use client";
 
-import { getActiveProjectId, getProject } from "@/persistence/project-library";
+import { t } from "@/i18n/use-t";
+import { getActiveProjectId, loadStoredProject } from "@/persistence/project-library";
 import { useProjectStore } from "@/stores/project-store";
 import { useEffect } from "react";
 import { toast } from "sonner";
@@ -23,9 +24,13 @@ export const useCollab = (): boolean => {
     const initialize = async () => {
       try {
         const activeId = await getActiveProjectId();
-        const activeProject = activeId ? await getProject(activeId) : null;
+        const activeResult = activeId ? await loadStoredProject(activeId) : null;
         if (cancelled) return;
-        if (activeProject) useProjectStore.getState().loadProject(activeProject);
+        if (activeResult?.status === "ok") {
+          useProjectStore.getState().loadProject(activeResult.project);
+        } else if (activeResult?.status === "corrupt") {
+          toast.error(t("project.activeCorrupt"));
+        }
 
         getBridge();
         unsubscribeProject = useProjectStore.subscribe(

@@ -362,6 +362,7 @@ export const ko = {
     "snap.labelPlaceholder": "스냅샷 이름…",
     "snap.saved": "스냅샷 저장됨",
     "snap.restored": "스냅샷 복원됨",
+    "snap.corrupt": "스냅샷이 손상되어 복원할 수 없습니다",
     "snap.restore": "복원",
     "snap.delete": "삭제",
     "snap.empty": "스냅샷이 없습니다.",
@@ -407,6 +408,8 @@ export const ko = {
     "project.opened": "\"{name}\" 프로젝트를 열었습니다",
     "project.imported": "\"{name}\" 가져오기 완료",
     "project.importFailed": "가져오기 실패",
+    "project.corrupt": "저장된 프로젝트가 손상되어 열 수 없습니다",
+    "project.activeCorrupt": "마지막 프로젝트가 손상되어 새 프로젝트를 열었습니다",
 
     // Context menu
     "ctx.split": "재생 위치에서 분할",

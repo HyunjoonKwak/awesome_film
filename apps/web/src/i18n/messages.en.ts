@@ -362,6 +362,7 @@ export const en = {
     "snap.labelPlaceholder": "Snapshot name…",
     "snap.saved": "Snapshot saved",
     "snap.restored": "Snapshot restored",
+    "snap.corrupt": "This snapshot is damaged and could not be restored",
     "snap.restore": "Restore",
     "snap.delete": "Delete",
     "snap.empty": "No snapshots yet.",
@@ -407,6 +408,8 @@ export const en = {
     "project.opened": "Opened \"{name}\"",
     "project.imported": "Imported \"{name}\"",
     "project.importFailed": "Import failed",
+    "project.corrupt": "This saved project is damaged and could not be opened",
+    "project.activeCorrupt": "The last project is damaged. Opened a new project instead",
 
     // Context menu
     "ctx.split": "Split at playhead",

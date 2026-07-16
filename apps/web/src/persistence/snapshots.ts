@@ -4,6 +4,7 @@
 
 import Dexie, { type Table } from "dexie";
 import type { Project } from "@cut/core";
+import { parseStoredProject } from "./project-export";
 
 export interface ProjectSnapshot {
   id: string;
@@ -53,7 +54,12 @@ export const listSnapshots = async (projectId: string): Promise<readonly Project
 
 export const loadSnapshot = async (id: string): Promise<Project | null> => {
   const row = await getDb().snapshots.get(id);
-  return row ? (JSON.parse(row.json) as Project) : null;
+  if (!row) return null;
+  try {
+    return parseStoredProject(JSON.parse(row.json));
+  } catch {
+    return null;
+  }
 };
 
 export const deleteSnapshot = async (id: string): Promise<void> => {
