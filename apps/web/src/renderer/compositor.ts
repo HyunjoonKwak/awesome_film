@@ -380,6 +380,19 @@ export class Compositor {
     for (const fx of enabled) {
       const def = getEffect(fx.type);
       if (!def) continue;
+      let lutBinding: ReturnType<typeof uploadLutTexture> | null = null;
+      if (fx.type === "lut") {
+        const lutId = String(fx.params.lutId ?? "");
+        const stored = lutId ? useLutStore.getState().getLut(lutId) : undefined;
+        if (!stored) continue;
+        try {
+          lutBinding = uploadLutTexture(gl, lutId, stored.raw);
+        } catch {
+          // An invalid/deleted LUT makes this effect a no-op instead of
+          // sampling an unbound texture and corrupting the rendered frame.
+          continue;
+        }
+      }
       for (const pass of def.passes) {
         const [, dst] = this.pingPong.current();
         gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
@@ -420,22 +433,20 @@ export class Compositor {
         }
 
         // LUT binding — only for the lut shader when a stored LUT is selected.
-        if (fx.type === "lut") {
-          const lutId = String(fx.params.lutId ?? "");
-          const stored = lutId ? useLutStore.getState().getLut(lutId) : undefined;
-          if (stored) {
-            try {
-              const { tex, size } = uploadLutTexture(gl, lutId, stored.raw);
-              gl.activeTexture(gl.TEXTURE2);
-              gl.bindTexture(gl.TEXTURE_2D, tex);
-              const lutLoc = prog.uniform("u_lut");
-              const sizeLoc = prog.uniform("u_lut_size");
-              if (lutLoc) gl.uniform1i(lutLoc, 2);
-              if (sizeLoc) gl.uniform1f(sizeLoc, size);
-            } catch {
-              /* malformed LUT — skip this pass's mapping */
-            }
-          }
+        if (lutBinding) {
+          const { tex, size, dimension, domainMin, domainMax } = lutBinding;
+          gl.activeTexture(gl.TEXTURE2);
+          gl.bindTexture(gl.TEXTURE_2D, tex);
+          const lutLoc = prog.uniform("u_lut");
+          const sizeLoc = prog.uniform("u_lut_size");
+          const dimensionLoc = prog.uniform("u_lut_dimension");
+          const domainMinLoc = prog.uniform("u_lut_domain_min");
+          const domainMaxLoc = prog.uniform("u_lut_domain_max");
+          if (lutLoc) gl.uniform1i(lutLoc, 2);
+          if (sizeLoc) gl.uniform1f(sizeLoc, size);
+          if (dimensionLoc) gl.uniform1i(dimensionLoc, dimension);
+          if (domainMinLoc) gl.uniform3f(domainMinLoc, ...domainMin);
+          if (domainMaxLoc) gl.uniform3f(domainMaxLoc, ...domainMax);
         }
 
         const uniforms = pass.uniforms({ params: fx.params, width: w, height: h });

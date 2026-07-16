@@ -2,10 +2,22 @@ import { createTexture, type GL } from "./gl";
 import { parseCube, type CubeLut } from "@/effects/lut/parse-cube";
 import { BoundedResourceCache } from "./bounded-resource-cache";
 
-// Unroll a cubic LUT into a single 2D tile strip of size (n*n) × n RGBA8.
-// Easier to sample on WebGL2 without 3D textures.
-const unrollToImageData = (lut: CubeLut): ImageData => {
+// Upload 1D curves as a single row; unroll a cubic LUT into a 2D tile strip
+// of size (n*n) × n. Both layouts use RGBA8 for broad WebGL2 support.
+const lutToImageData = (lut: CubeLut): ImageData => {
   const n = lut.size;
+  if (lut.dimension === 1) {
+    const data = new Uint8ClampedArray(n * 4);
+    for (let index = 0; index < n; index++) {
+      const source = index * 3;
+      const target = index * 4;
+      data[target] = Math.round(lut.data[source]! * 255);
+      data[target + 1] = Math.round(lut.data[source + 1]! * 255);
+      data[target + 2] = Math.round(lut.data[source + 2]! * 255);
+      data[target + 3] = 255;
+    }
+    return new ImageData(data, n, 1);
+  }
   const width = n * n;
   const height = n;
   const data = new Uint8ClampedArray(width * height * 4);
@@ -35,6 +47,9 @@ const unrollToImageData = (lut: CubeLut): ImageData => {
 interface CachedLutTexture {
   readonly tex: WebGLTexture;
   readonly size: number;
+  readonly dimension: 1 | 3;
+  readonly domainMin: readonly [number, number, number];
+  readonly domainMax: readonly [number, number, number];
   readonly raw: string;
 }
 
@@ -45,7 +60,7 @@ export const uploadLutTexture = (
   gl: GL,
   lutId: string,
   rawCube: string,
-): { tex: WebGLTexture; size: number } => {
+): Omit<CachedLutTexture, "raw"> => {
   let perGl = cache.get(gl);
   if (!perGl) {
     perGl = new BoundedResourceCache(MAX_LUT_TEXTURES, (entry) => gl.deleteTexture(entry.tex));
@@ -54,7 +69,7 @@ export const uploadLutTexture = (
   const cached = perGl.get(lutId);
   if (cached?.raw === rawCube) return cached;
   const parsed = parseCube(rawCube);
-  const img = unrollToImageData(parsed);
+  const img = lutToImageData(parsed);
   const tex = createTexture(gl);
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -73,7 +88,14 @@ export const uploadLutTexture = (
     gl.UNSIGNED_BYTE,
     img.data,
   );
-  const entry = { tex, size: parsed.size, raw: rawCube };
+  const entry = {
+    tex,
+    size: parsed.size,
+    dimension: parsed.dimension,
+    domainMin: parsed.domainMin,
+    domainMax: parsed.domainMax,
+    raw: rawCube,
+  };
   perGl.set(lutId, entry);
   return entry;
 };

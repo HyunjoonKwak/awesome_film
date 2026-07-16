@@ -1,10 +1,10 @@
 import type { EffectDefinition } from "../types";
 
-// LUT effect — the actual 3D texture upload happens in the compositor.
+// LUT effect — the actual 1D/3D texture upload happens in the compositor.
 // `intensity` blends the LUT-mapped colour with the original.
 // `lutId` is a stored LUT id (see lut-store); the compositor reads its raw
-// `.cube` text, parses it, and uploads the data into a 64×64×64 RGB texture
-// on demand. We expose `lutId` as a string param so plugins / scripting can
+// `.cube` text, parses it, and uploads the data into a 2D RGB texture on
+// demand. We expose `lutId` as a string param so plugins / scripting can
 // still set it programmatically; the inspector UI will get its own picker.
 export const lut: EffectDefinition = {
   type: "lut",

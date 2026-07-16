@@ -1,14 +1,26 @@
-// 3D LUT sampled from a 2D strip texture (HALD-style: size×size cells of
-// size×size each). Bilinear in RG, linear in blue between two cells.
+// 1D RGB curves use a single texture row. 3D LUTs use a 2D strip texture
+// (HALD-style), bilinear in RG and linear between blue cells.
 export const fs = /* glsl */ `#version 300 es
 precision mediump float;
 in vec2 v_uv;
 uniform sampler2D u_tex;
 uniform sampler2D u_lut;
 uniform float u_lut_size;
+uniform int u_lut_dimension;
+uniform vec3 u_lut_domain_min;
+uniform vec3 u_lut_domain_max;
 uniform float u_intensity;
 out vec4 fragColor;
 vec3 sampleLut(vec3 rgb) {
+  rgb = clamp((rgb - u_lut_domain_min) / (u_lut_domain_max - u_lut_domain_min), 0.0, 1.0);
+  if (u_lut_dimension == 1) {
+    vec3 uv = (rgb * (u_lut_size - 1.0) + 0.5) / u_lut_size;
+    return vec3(
+      texture(u_lut, vec2(uv.r, 0.5)).r,
+      texture(u_lut, vec2(uv.g, 0.5)).g,
+      texture(u_lut, vec2(uv.b, 0.5)).b
+    );
+  }
   float blueIdx = rgb.b * (u_lut_size - 1.0);
   float floorB = floor(blueIdx);
   float frac = blueIdx - floorB;
