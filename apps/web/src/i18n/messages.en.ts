@@ -21,6 +21,8 @@ export const en = {
     "collab.joined": "Joined room \"{room}\"",
     "collab.left": "Left room",
     "collab.joinFailed": "Join failed: {msg}",
+    "collab.receiving": "Receiving {name}",
+    "collab.syncFailed": "Media sync failed",
 
     // Media bin
     "media.title": "Media",

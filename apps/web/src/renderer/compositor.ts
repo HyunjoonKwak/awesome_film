@@ -427,6 +427,8 @@ export class Compositor {
   }
 
   private readonly decodePrepared = new Set<string>();
+  private readonly decodePreparing = new Set<string>();
+  private readonly decodeRetryAt = new Map<string, number>();
 
   private async uploadClipSource(clip: MediaClip, asset: MediaAsset): Promise<WebGLTexture | null> {
     // Map timeline time → source time. A frozen clip always shows one source
@@ -442,11 +444,25 @@ export class Compositor {
     if (asset.kind === "video") {
       const provider = getFrameProvider();
       // Prepare the decoder once per asset, asynchronously.
-      if (!this.decodePrepared.has(asset.id)) {
-        this.decodePrepared.add(asset.id);
-        void readMediaFile(asset.opfsPath).then((blob) => {
-          if (blob) void provider.prepare(asset.id, blob);
-        });
+      if (
+        !this.decodePrepared.has(asset.id) &&
+        !this.decodePreparing.has(asset.id) &&
+        (this.decodeRetryAt.get(asset.id) ?? 0) <= Date.now()
+      ) {
+        this.decodePreparing.add(asset.id);
+        void (async () => {
+          try {
+            const blob = await readMediaFile(asset.opfsPath);
+            if (blob && (await provider.prepare(asset.id, blob))) {
+              this.decodePrepared.add(asset.id);
+              this.decodeRetryAt.delete(asset.id);
+            } else {
+              this.decodeRetryAt.set(asset.id, Date.now() + 1000);
+            }
+          } finally {
+            this.decodePreparing.delete(asset.id);
+          }
+        })();
       }
       const frame = provider.framesFor(asset.id, Math.max(0, relativeMs));
       if (frame) {
@@ -526,6 +542,9 @@ export class Compositor {
     for (const tex of this.bgMaskTextures.values()) this.gl.deleteTexture(tex);
     this.bgMaskTextures.clear();
     this.bgMaskTime.clear();
+    this.decodePrepared.clear();
+    this.decodePreparing.clear();
+    this.decodeRetryAt.clear();
     this.scratch.dispose();
     this.shaders.dispose();
     this.pingPong.dispose();

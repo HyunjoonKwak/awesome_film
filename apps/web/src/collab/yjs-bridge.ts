@@ -5,6 +5,7 @@ import { WebsocketProvider } from "y-websocket";
 import * as Y from "yjs";
 import { type PeerCursor, useAwarenessStore } from "./awareness-store";
 import { useCollabSessionStore } from "./collab-session-store";
+import { createMediaTransferManager, type MediaTransferManager } from "./media-transfer";
 import { createProjectCrdt } from "./project-crdt";
 import { useSaveStateStore } from "./save-state-store";
 
@@ -78,6 +79,7 @@ export const getBridge = (): CollabBridge => {
 
   let applyingRemote = false;
   let disposed = false;
+  let mediaTransfer: MediaTransferManager | null = null;
 
   const flush = (): void => {
     const project = useProjectStore.getState().project;
@@ -99,6 +101,7 @@ export const getBridge = (): CollabBridge => {
     } finally {
       applyingRemote = false;
     }
+    mediaTransfer?.scan();
     return project;
   };
 
@@ -122,6 +125,7 @@ export const getBridge = (): CollabBridge => {
       }
       useSaveStateStore.getState().setState("saving");
       flush();
+      mediaTransfer?.scan();
     },
   );
 
@@ -196,12 +200,18 @@ export const getBridge = (): CollabBridge => {
 
   const joinRoom = (server: string, room: string) => {
     if (ws) {
+      mediaTransfer?.dispose();
+      mediaTransfer = null;
       ws.awareness.off("change", peerSync);
       unsubscribeCursor?.();
       unsubscribeCursor = null;
       ws.destroy();
     }
     ws = new WebsocketProvider(server, room, doc);
+    mediaTransfer = createMediaTransferManager({
+      awareness: ws.awareness,
+      getProject: () => useProjectStore.getState().project,
+    });
     broadcastCursor();
     ws.awareness.on("change", peerSync);
     unsubscribeCursor = useProjectStore.subscribe(
@@ -214,6 +224,8 @@ export const getBridge = (): CollabBridge => {
 
   const leaveRoom = () => {
     if (ws) {
+      mediaTransfer?.dispose();
+      mediaTransfer = null;
       ws.awareness.off("change", peerSync);
       unsubscribeCursor?.();
       unsubscribeCursor = null;

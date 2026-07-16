@@ -11,7 +11,85 @@ const getRoot = async (): Promise<FileSystemDirectoryHandle> => {
   return await navigator.storage.getDirectory();
 };
 
+const revokeMediaUrl = (key: string): void => {
+  const url = objectUrls.get(key);
+  if (!url) return;
+  URL.revokeObjectURL(url);
+  objectUrls.delete(key);
+};
+
+export interface MediaFileWriter {
+  write: (offset: number, data: Uint8Array) => Promise<void>;
+  close: () => Promise<void>;
+  abort: () => Promise<void>;
+}
+
+// Opens a media file for incremental, positional writes. Collaboration uses
+// this instead of assembling a complete remote asset in memory first.
+export const createMediaFileWriter = async (
+  key: string,
+  mimeType: string,
+): Promise<MediaFileWriter> => {
+  revokeMediaUrl(key);
+
+  if (!supportsOpfs()) {
+    const chunks: ArrayBuffer[] = [];
+    let nextOffset = 0;
+    let settled = false;
+    return {
+      write: async (offset, data) => {
+        if (settled) throw new Error("Media writer is already settled");
+        if (offset !== nextOffset) throw new Error("Media chunks must be written sequentially");
+        const copy = Uint8Array.from(data);
+        chunks.push(copy.buffer);
+        nextOffset += copy.byteLength;
+      },
+      close: async () => {
+        if (settled) return;
+        settled = true;
+        inMemory.set(key, new Blob(chunks, { type: mimeType }));
+      },
+      abort: async () => {
+        if (settled) return;
+        settled = true;
+        chunks.length = 0;
+        inMemory.delete(key);
+      },
+    };
+  }
+
+  const root = await getRoot();
+  const handle = await root.getFileHandle(key, { create: true });
+  const writable = await handle.createWritable();
+  let settled = false;
+  return {
+    write: async (offset, data) => {
+      if (settled) throw new Error("Media writer is already settled");
+      await writable.write({ type: "write", position: offset, data: Uint8Array.from(data) });
+    },
+    close: async () => {
+      if (settled) return;
+      settled = true;
+      await writable.close();
+    },
+    abort: async () => {
+      if (settled) return;
+      settled = true;
+      try {
+        await writable.abort();
+      } finally {
+        try {
+          await root.removeEntry(key);
+        } catch {
+          // The browser may already have discarded the incomplete entry.
+        }
+      }
+    },
+  };
+};
+
 export const writeMediaFile = async (key: string, file: File): Promise<string> => {
+  revokeMediaUrl(key);
   if (!supportsOpfs()) {
     inMemory.set(key, file);
     return key;
@@ -46,11 +124,7 @@ export const getMediaUrl = async (key: string): Promise<string | null> => {
 };
 
 export const deleteMediaFile = async (key: string): Promise<void> => {
-  const url = objectUrls.get(key);
-  if (url) {
-    URL.revokeObjectURL(url);
-    objectUrls.delete(key);
-  }
+  revokeMediaUrl(key);
   inMemory.delete(key);
   if (!supportsOpfs()) return;
   try {

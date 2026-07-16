@@ -21,6 +21,8 @@ export const ko = {
     "collab.joined": "\"{room}\" 방에 참여했습니다",
     "collab.left": "방에서 나왔습니다",
     "collab.joinFailed": "참여 실패: {msg}",
+    "collab.receiving": "{name} 받는 중",
+    "collab.syncFailed": "미디어 동기화 실패",
 
     // Media bin
     "media.title": "미디어",

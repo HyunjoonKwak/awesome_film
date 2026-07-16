@@ -6,6 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useAwarenessStore } from "./awareness-store";
 import { useCollabSessionStore } from "./collab-session-store";
+import { useMediaTransferStore } from "./media-transfer-store";
 import { getBridge } from "./yjs-bridge";
 
 const DEFAULT_WS = "wss://demos.yjs.dev"; // public test relay
@@ -13,6 +14,8 @@ const DEFAULT_WS = "wss://demos.yjs.dev"; // public test relay
 export function CollabBar() {
   const peers = useAwarenessStore((s) => s.peers);
   const joinedRoom = useCollabSessionStore((state) => state.room);
+  const transfer = useMediaTransferStore((state) => state.progress);
+  const transferError = useMediaTransferStore((state) => state.error);
   // Random per-session room instead of a shared public one, so clicking Share
   // doesn't sync your project into a guessable room on the open relay. Share
   // this generated code out-of-band with whoever should join.
@@ -40,6 +43,21 @@ export function CollabBar() {
 
   return (
     <div className="flex items-center gap-2">
+      {transfer ? (
+        <span
+          className="max-w-28 truncate text-3xs text-ink-2"
+          title={t("collab.receiving", { name: transfer.name })}
+        >
+          {transfer.name}{" "}
+          {transfer.totalBytes > 0
+            ? `${Math.round((transfer.receivedBytes / transfer.totalBytes) * 100)}%`
+            : "…"}
+        </span>
+      ) : transferError ? (
+        <span className="max-w-28 truncate text-3xs text-red-400" title={transferError}>
+          {t("collab.syncFailed")}
+        </span>
+      ) : null}
       <div className="flex -space-x-2">
         {Array.from(peers.values())
           .slice(0, 5)

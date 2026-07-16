@@ -11,25 +11,35 @@ type Source = HTMLVideoElement | HTMLImageElement;
 export class FrameSourcePool {
   private readonly cache = new Map<string, Source>();
   private readonly pending = new Map<string, Promise<Source | null>>();
+  private readonly retryAt = new Map<string, number>();
 
   async get(asset: MediaAsset): Promise<Source | null> {
     const cached = this.cache.get(asset.id);
     if (cached) return cached;
+    if ((this.retryAt.get(asset.id) ?? 0) > Date.now()) return null;
     const inflight = this.pending.get(asset.id);
     if (inflight) return inflight;
     const promise = this.load(asset);
     this.pending.set(asset.id, promise);
     const loaded = await promise;
     this.pending.delete(asset.id);
-    if (loaded) this.cache.set(asset.id, loaded);
+    if (loaded) {
+      this.cache.set(asset.id, loaded);
+      this.retryAt.delete(asset.id);
+    } else {
+      // Remote collaboration metadata can arrive before its binary file.
+      // Retry with a small backoff instead of permanently caching the miss or
+      // probing OPFS on every animation frame.
+      this.retryAt.set(asset.id, Date.now() + 1000);
+    }
     return loaded;
   }
 
   private async load(asset: MediaAsset): Promise<Source | null> {
     // Use the low-res proxy for preview/scrub when enabled and available.
     const useProxy = useProxyStore.getState().useProxy;
-    const path = useProxy && asset.proxyPath ? asset.proxyPath : asset.opfsPath;
-    const url = await getMediaUrl(path);
+    const proxyUrl = useProxy && asset.proxyPath ? await getMediaUrl(asset.proxyPath) : null;
+    const url = proxyUrl ?? (await getMediaUrl(asset.opfsPath));
     if (!url) return null;
     if (asset.kind === "image") {
       return await new Promise<Source | null>((resolve) => {
@@ -58,5 +68,6 @@ export class FrameSourcePool {
   dispose() {
     this.cache.clear();
     this.pending.clear();
+    this.retryAt.clear();
   }
 }
