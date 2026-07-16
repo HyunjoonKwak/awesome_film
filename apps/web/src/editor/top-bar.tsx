@@ -28,9 +28,20 @@ export function TopBar() {
   useEffect(() => setDraftName(projectName), [projectName]);
   const t = useT();
 
-  // Surface the active project in the window / tab title.
+  // Surface the active project in the window / tab title. Next.js can apply
+  // streamed route metadata AFTER hydration, clobbering a one-shot assignment
+  // — so watch the <title> node and re-assert ours until unmount.
   useEffect(() => {
-    document.title = `${projectName} — Cut Editor`;
+    const desired = `${projectName} — Cut Editor`;
+    document.title = desired;
+    const el = document.querySelector("title");
+    if (!el) return;
+    const observer = new MutationObserver(() => {
+      // Guard prevents self-triggering: once equal, the callback no-ops.
+      if (document.title !== desired) document.title = desired;
+    });
+    observer.observe(el, { childList: true, characterData: true, subtree: true });
+    return () => observer.disconnect();
   }, [projectName]);
 
   // Desktop (Electron) native menu bridge: the preload script re-dispatches
