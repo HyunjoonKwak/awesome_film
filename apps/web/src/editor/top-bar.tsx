@@ -32,7 +32,7 @@ export function TopBar() {
   // streamed route metadata AFTER hydration, clobbering a one-shot assignment
   // — so watch the <title> node and re-assert ours until unmount.
   useEffect(() => {
-    const desired = `${projectName} — Cut Editor`;
+    const desired = `${projectName} — Reelog`;
     document.title = desired;
     const el = document.querySelector("title");
     if (!el) return;
@@ -84,7 +84,7 @@ export function TopBar() {
           }}
           className="rounded bg-transparent px-1 text-sm font-medium text-ink-1 outline-none hover:bg-white/5 focus:bg-white/10"
         />
-        <span className="text-xs text-ink-3">cut_editor</span>
+        <span className="text-xs text-ink-3">Reelog</span>
         <SaveBadge state={saveState} lastSavedAt={lastSavedAt} />
       </div>
 

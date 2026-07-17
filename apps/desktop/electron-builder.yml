@@ -1,6 +1,6 @@
 appId: dev.cuteditor.app
-productName: Cut Editor
-copyright: Copyright © 2026 Cut Editor contributors
+productName: Reelog
+copyright: Copyright © 2026 Reelog contributors
 
 directories:
   output: dist

@@ -14,7 +14,7 @@ const DEV_URL = process.env.CUT_DEV_URL ?? "http://localhost:3000/editor";
 
 // Proper product name for the application menu / dock (package.json's
 // lowercase `name` would otherwise leak into the UI).
-app.setName("Cut Editor");
+app.setName("Reelog");
 // In a packaged build the web export lives at <Resources>/web (see
 // electron-builder.yml `extraResources`). Unpackaged runs read from the
 // repo's apps/web/out directory.

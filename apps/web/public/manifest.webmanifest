@@ -1,6 +1,6 @@
 {
-  "name": "cut_editor",
-  "short_name": "cut_editor",
+  "name": "Reelog",
+  "short_name": "Reelog",
   "description": "Open-source, AI-native, collaborative video editor.",
   "start_url": "/editor",
   "scope": "/",

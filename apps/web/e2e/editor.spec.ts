@@ -51,13 +51,13 @@ test("persists a newly named project across a reload", async ({ page }) => {
   await expect(projectName).toHaveValue("Untitled");
   await projectName.fill("E2E persistence project");
   await projectName.press("Enter");
-  await expect(page).toHaveTitle("E2E persistence project — Cut Editor");
+  await expect(page).toHaveTitle("E2E persistence project — Reelog");
 
   await expect.poll(() => projectNamesInLibrary(page)).toContain("E2E persistence project");
   await page.reload();
 
   await expect(projectName).toHaveValue("E2E persistence project");
-  await expect(page).toHaveTitle("E2E persistence project — Cut Editor");
+  await expect(page).toHaveTitle("E2E persistence project — Reelog");
 });
 
 test("synchronizes project edits between isolated browser sessions", async ({ browser, page }) => {

@@ -4,12 +4,12 @@ import { RegisterSW } from "./register-sw";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "cut_editor — AI-native video editor",
+  title: "Reelog — AI-native video editor",
   description:
     "Open-source, collaborative, AI-native video editor for web, desktop, and mobile.",
-  applicationName: "cut_editor",
+  applicationName: "Reelog",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, statusBarStyle: "black", title: "cut_editor" },
+  appleWebApp: { capable: true, statusBarStyle: "black", title: "Reelog" },
   icons: { icon: "/icon.svg", apple: "/icon.svg" },
 };
 

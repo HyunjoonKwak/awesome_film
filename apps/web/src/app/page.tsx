@@ -25,7 +25,7 @@ export default function HomePage() {
       <div className="mx-auto max-w-5xl px-6 py-20">
         <header className="flex items-center gap-3 text-ink-2">
           <Film className="size-6 text-accent" />
-          <span className="text-sm uppercase tracking-[0.2em]">cut_editor</span>
+          <span className="text-sm uppercase tracking-[0.2em]">Reelog</span>
         </header>
 
         <section className="mt-16 max-w-3xl">
