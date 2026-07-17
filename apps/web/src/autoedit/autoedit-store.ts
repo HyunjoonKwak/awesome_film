@@ -27,6 +27,10 @@ interface AutoEditState {
   setMusicAssetId: (id: ID | null) => void;
   togglePin: (id: ID) => void;
   toggleExclude: (id: ID) => void;
+  // 미디어 빈의 일괄 지정 — 선택된 자산들을 한 번에 사용/제외/해제.
+  markPinned: (ids: readonly ID[]) => void;
+  markExcluded: (ids: readonly ID[]) => void;
+  clearMarks: (ids: readonly ID[]) => void;
   setMapTransitions: (on: boolean) => void;
   setGenerating: (on: boolean) => void;
   setResult: (r: {
@@ -63,6 +67,21 @@ export const useAutoEditStore = create<AutoEditState>((set) => ({
     set((s) => ({
       excluded: s.excluded.includes(id) ? s.excluded.filter((x) => x !== id) : [...s.excluded, id],
       pinned: s.pinned.filter((x) => x !== id),
+    })),
+  markPinned: (ids) =>
+    set((s) => ({
+      pinned: [...new Set([...s.pinned, ...ids])],
+      excluded: s.excluded.filter((x) => !ids.includes(x)),
+    })),
+  markExcluded: (ids) =>
+    set((s) => ({
+      excluded: [...new Set([...s.excluded, ...ids])],
+      pinned: s.pinned.filter((x) => !ids.includes(x)),
+    })),
+  clearMarks: (ids) =>
+    set((s) => ({
+      pinned: s.pinned.filter((x) => !ids.includes(x)),
+      excluded: s.excluded.filter((x) => !ids.includes(x)),
     })),
   setMapTransitions: (mapTransitions) => set({ mapTransitions }),
   setGenerating: (generating) => set({ generating }),

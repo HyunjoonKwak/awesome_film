@@ -93,6 +93,34 @@ describe("buildCandidates", () => {
     expect(rejected[0]!.reason).toBe("사용자 제외");
   });
 
+  it("respects the user-marked usable range (useInMs/useOutMs)", () => {
+    // hot sample sits at 5s, but the user limits the range to 6–9s —
+    // the candidate window must stay inside that range.
+    const a = { ...asset("a", "video", 100), useInMs: 6000, useOutMs: 9000 } as MediaAsset;
+    const { candidates } = buildCandidates(
+      [a],
+      new Map([["a" as ID, analysis("a")]]),
+      { pinned: [], excluded: [] },
+      2000,
+    );
+    expect(candidates).toHaveLength(1); // 3s range → no second window
+    const c = candidates[0]!;
+    expect(c.srcStartMs).toBeGreaterThanOrEqual(6000);
+    expect(c.srcStartMs + c.maxDurMs).toBeLessThanOrEqual(9000);
+  });
+
+  it("range without analyzed samples falls back to the range itself", () => {
+    const a = { ...asset("a", "video", 100), useInMs: 2000, useOutMs: 4000 } as MediaAsset;
+    const { candidates } = buildCandidates(
+      [a],
+      new Map([["a" as ID, analysis("a", { samples: [], interest: [] })]]),
+      { pinned: [], excluded: [] },
+      2000,
+    );
+    expect(candidates[0]!.srcStartMs).toBe(2000);
+    expect(candidates[0]!.maxDurMs).toBe(2000);
+  });
+
   it("orders chronologically and picks the hottest window", () => {
     const { candidates } = buildCandidates(
       [asset("late", "video", 2000), asset("early", "video", 1000)],

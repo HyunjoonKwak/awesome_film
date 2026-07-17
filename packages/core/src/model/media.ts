@@ -25,6 +25,8 @@ export interface MediaAsset {
                                    // to File.lastModified when absent
   readonly gpsLat?: number;        // capture GPS, decimal degrees (EXIF / ISO6709)
   readonly gpsLon?: number;
+  readonly useInMs?: Ms;           // user-marked usable range within the source —
+  readonly useOutMs?: Ms;          // auto-edit candidates and timeline adds respect it
   readonly filmstripDataUrl?: string; // wide multi-frame strip over full source
   readonly filmstripFrames?: number;  // number of frames in the strip
   readonly waveformPeaks?: readonly number[]; // downsampled abs-max peaks

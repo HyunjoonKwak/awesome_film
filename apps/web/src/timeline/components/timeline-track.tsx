@@ -59,15 +59,19 @@ export function TimelineTrack({ track, width }: Props) {
   const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
     if (!accepts || !dragAsset) return;
     e.preventDefault();
-    const start = dropMsFromEvent(e, dragAsset.durationMs);
+    // 사용 구간이 지정된 자산은 그 구간만 배치한다.
+    const inMs = dragAsset.useInMs ?? 0;
+    const outMs = dragAsset.useOutMs ?? dragAsset.durationMs;
+    const useMs = Math.max(200, outMs - inMs);
+    const start = dropMsFromEvent(e, useMs);
     useProjectStore.getState().addClipToTrack(track.id, {
       kind: "media",
       id: newId(),
       assetId: dragAsset.id,
       start,
-      duration: dragAsset.durationMs,
-      trimIn: 0,
-      trimOut: dragAsset.durationMs,
+      duration: useMs,
+      trimIn: inMs,
+      trimOut: outMs,
       speed: 1,
       effects: [],
       keyframes: [],

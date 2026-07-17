@@ -83,30 +83,38 @@ export const buildCandidates = (
       });
       continue;
     }
-    // videos: best window (+ a second, far-apart window for long clips)
+    // videos: best window (+ a second, far-apart window for long clips),
+    // constrained to the user-marked usable range when one is set.
+    const rin = asset.useInMs ?? 0;
+    const rout = asset.useOutMs ?? asset.durationMs;
+    const rangeMs = Math.max(0, rout - rin);
     if (!a || a.samples.length === 0) {
-      candidates.push({ ...base, isPhoto: false, srcStartMs: 0, maxDurMs: asset.durationMs, score: 0.4 });
+      candidates.push({ ...base, isPhoto: false, srcStartMs: rin, maxDurMs: Math.max(500, rangeMs), score: 0.4 });
       continue;
     }
-    const w1 = bestWindow(a.samples, a.interest, minWindowMs);
+    const inRange = a.samples
+      .map((s, i) => ({ s, interest: a.interest[i] ?? 0 }))
+      .filter(({ s }) => s.atMs >= rin && s.atMs <= rout);
+    const pool2 = inRange.length > 0 ? inRange : a.samples.map((s, i) => ({ s, interest: a.interest[i] ?? 0 }));
+    const w1 = bestWindow(pool2.map((x) => x.s), pool2.map((x) => x.interest), minWindowMs);
+    const start1 = Math.max(rin, Math.min(w1.startMs, Math.max(rin, rout - minWindowMs)));
     candidates.push({
       ...base,
       isPhoto: false,
-      srcStartMs: w1.startMs,
-      maxDurMs: Math.max(500, asset.durationMs - w1.startMs),
+      srcStartMs: start1,
+      maxDurMs: Math.max(500, rout - start1),
       score: w1.score,
     });
-    if (asset.durationMs > 20_000) {
-      const farIdx = a.samples.findIndex((s) => Math.abs(s.atMs - w1.startMs) > asset.durationMs * 0.35);
-      if (farIdx >= 0) {
-        const subSamples = a.samples.filter((s) => Math.abs(s.atMs - w1.startMs) > asset.durationMs * 0.3);
-        const subInterest = subSamples.map((s) => a.interest[a.samples.indexOf(s)] ?? 0);
-        const w2 = bestWindow(subSamples, subInterest, minWindowMs);
+    if (rangeMs > 20_000) {
+      const subSamples = pool2.filter(({ s }) => Math.abs(s.atMs - start1) > rangeMs * 0.3);
+      if (subSamples.length > 0) {
+        const w2 = bestWindow(subSamples.map((x) => x.s), subSamples.map((x) => x.interest), minWindowMs);
+        const start2 = Math.max(rin, Math.min(w2.startMs, Math.max(rin, rout - minWindowMs)));
         candidates.push({
           ...base,
           isPhoto: false,
-          srcStartMs: w2.startMs,
-          maxDurMs: Math.max(500, asset.durationMs - w2.startMs),
+          srcStartMs: start2,
+          maxDurMs: Math.max(500, rout - start2),
           score: w2.score * 0.9, // slight discount for second helpings
         });
       }

@@ -86,6 +86,8 @@ interface ProjectStoreState {
     assetId: ID,
     proxy: { proxyPath: string; proxyWidth: number; proxyHeight: number },
   ) => void;
+  // 사용 구간 지정 — undefined 전달 시 구간 해제(전체 사용).
+  setAssetUseRange: (assetId: ID, range: { inMs: Ms; outMs: Ms } | undefined) => void;
   addNewTrack: (kind: TrackKind) => void;
   addTextClipAtPlayhead: (text?: string) => void;
   addShapeClipAtPlayhead: (shape: ShapeKind) => void;
