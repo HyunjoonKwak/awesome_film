@@ -1,23 +1,27 @@
-# cut_editor
+# Reelog
 
 **English** · [한국어](README.ko.md)
 
 An open-source, AI-native, collaborative video editor for the web — built to
 match Final Cut Pro's craft and CapCut's accessibility, with collaboration
-and AI features neither of them ships.
+and AI features neither of them ships. Prebuilt macOS apps are on the
+[Releases page](../../releases/latest).
 
-> Started from a study of [OpenCut](https://github.com/OpenCut-app/OpenCut)
-> (cloned into `reference/` for offline reading; not part of the build).
+> Formerly `cut_editor` (the repo and on-disk data identifiers keep that name
+> for continuity). Started from a study of
+> [OpenCut](https://github.com/OpenCut-app/OpenCut) (cloned into `reference/`
+> for offline reading; not part of the build).
 
 ## Why another editor?
 
-| | Final Cut Pro | CapCut | OpenCut | **cut_editor** |
+| | Final Cut Pro | CapCut | OpenCut | **Reelog** |
 |--|:--:|:--:|:--:|:--:|
 | Open source | ❌ | ❌ | ✅ | ✅ |
 | Free for everything | ❌ | partial | ✅ | ✅ |
 | Browser-native | ❌ | ❌ | ✅ | ✅ |
 | AI: subtitles + scene + silence | partial | ✅ | partial | ✅ |
 | Local AI (Whisper, MediaPipe) | ❌ | ❌ | partial | ✅ |
+| On-device auto-edit (travel/landscape) | ❌ | cloud | ❌ | ✅ |
 | Realtime co-edit | ❌ | partial | ❌ | ✅ |
 | Plugin SDK | ✅ | ❌ | ❌ | ✅ |
 | Magnetic timeline + ripple | ✅ | ❌ | partial | ✅ |
@@ -38,8 +42,9 @@ plugin SDK.
 | Renderer | WebGL2 compositor, ping-pong FBOs, multi-pass effect chain, keyframe interpolation |
 | Effects | 24 built-in GPU/audio effects, 1D/3D `.cube` LUTs, vector masks, blend modes, and background removal |
 | Text | Canvas2D-rendered text clips with size/color/bg controls + a dedicated subtitles track |
-| Media | OPFS-backed assets, thumbnail/waveform probe, drag-drop ingest |
-| AI (all local) | Auto silence cut (WebAudio RMS), Whisper transcription (HuggingFace), Scene detect (χ²), Background removal (MediaPipe Selfie) |
+| Media | OPFS-backed assets, thumbnail/filmstrip/waveform probe, drag-drop ingest with progress + cancel, proxies, thumbnail sizing, marquee multi-select, use/skip marks, per-asset usable-range trim |
+| AI (all local) | Auto silence cut (WebAudio RMS), Whisper transcription (HuggingFace), Scene detect (χ²), Background removal (MediaPipe Selfie), Smile detection (FaceLandmarker), opt-in semantic tags/dedup (MobileCLIP) |
+| Auto-edit | 6-step wizard for travel/landscape footage: junk filter (blur/exposure/shake), interest scoring, beat-grid assembly with photo stacks + Ken Burns, GPS/date story chapters with offline geocoding, rendered map-transition clips, YouTube Audio Library / Suno music flow, beat-snap re-conform when music changes — applied as one undo step on dedicated AUTO tracks |
 | Export | WebCodecs H.264/VP9/AV1 + chunked stereo AAC mixer, streaming LUFS normalization, work ranges, four presets |
 | Persistence | Validated project library + snapshots, Yjs/IndexedDB state, OPFS media, corruption-safe recovery |
 | Collaboration | Ticket-authenticated y-websocket rooms, validated CRDT edits, awareness, peer media transfer |
@@ -88,8 +93,9 @@ peer media transfer into the receiving browser's OPFS.
 
 ## Install as an app on macOS
 
-cut_editor ships a PWA manifest + service worker so you can install it as a
-standalone desktop window — no extra tooling required.
+Reelog ships a PWA manifest + service worker so you can install it as a
+standalone desktop window — no extra tooling required. Prefer a native app?
+Grab the prebuilt `.dmg` from the [Releases page](../../releases/latest).
 
 **Safari (recommended on macOS)**
 
@@ -139,15 +145,15 @@ push. The workflow lives at
 **Tagged release (recommended)**
 
 ```bash
-# 1. Bump the version in apps/desktop/package.json (e.g. 0.1.0 → 0.1.1).
+# 1. Bump the version in apps/desktop/package.json (e.g. 0.2.2 → 0.2.3).
 #    The number must match the tag you push next.
 
 # 2. Commit the bump.
-git commit -am "chore: bump desktop to 0.1.1"
+git commit -am "chore: bump desktop to 0.2.3"
 git push
 
 # 3. Push the tag — this is what fires the workflow.
-git tag v0.1.1
+git tag v0.2.3
 git push --tags
 ```
 
@@ -165,7 +171,7 @@ can't be opened"** dialog — right-click → Open won't bypass it. Users (or
 you) need to strip the attribute once:
 
 ```bash
-xattr -cr /Applications/cut_editor.app
+xattr -cr /Applications/Reelog.app
 ```
 
 To ship a properly signed + notarised `.dmg` that opens with no prompts at
@@ -174,7 +180,7 @@ all, add the Apple Developer secrets to the repo (`CSC_LINK`,
 `APPLE_TEAM_ID`) and remove the `identity: null` line — no workflow change
 required.
 
-## Roadmap (post v0.1)
+## Roadmap (post v0.2)
 
 - WebGPU renderer and WGSL shader support
 - Compound / nested sequences

@@ -1,22 +1,25 @@
-# cut_editor
+# Reelog
 
 [English](README.md) · **한국어**
 
 웹용 오픈소스 AI 기반 협업 비디오 에디터 — Final Cut Pro의 완성도와 CapCut의
 접근성을 모두 잡되, 두 도구 어디에도 없는 협업·로컬 AI 기능까지 함께 제공합니다.
+macOS용 빌드는 [Releases 페이지](../../releases/latest)에서 받을 수 있습니다.
 
-> [OpenCut](https://github.com/OpenCut-app/OpenCut) 학습에서 출발했습니다
-> (오프라인 참고용으로 `reference/`에 클론, 빌드에 포함되지 않음).
+> 이전 이름은 `cut_editor`입니다 (저장소와 디스크 데이터 식별자는 호환을 위해
+> 그 이름을 유지). [OpenCut](https://github.com/OpenCut-app/OpenCut) 학습에서
+> 출발했습니다 (오프라인 참고용으로 `reference/`에 클론, 빌드에 포함되지 않음).
 
 ## 왜 또 하나의 에디터인가?
 
-| | Final Cut Pro | CapCut | OpenCut | **cut_editor** |
+| | Final Cut Pro | CapCut | OpenCut | **Reelog** |
 |--|:--:|:--:|:--:|:--:|
 | 오픈소스 | ❌ | ❌ | ✅ | ✅ |
 | 전체 기능 무료 | ❌ | 일부 | ✅ | ✅ |
 | 브라우저 네이티브 | ❌ | ❌ | ✅ | ✅ |
 | AI: 자막 + 장면 + 묵음 | 일부 | ✅ | 일부 | ✅ |
 | 로컬 AI (Whisper, MediaPipe) | ❌ | ❌ | 일부 | ✅ |
+| 온디바이스 자동 편집 (여행/풍경) | ❌ | 클라우드 | ❌ | ✅ |
 | 실시간 협업 편집 | ❌ | 일부 | ❌ | ✅ |
 | 플러그인 SDK | ✅ | ❌ | ❌ | ✅ |
 | 마그네틱 타임라인 + 리플 | ✅ | ❌ | 일부 | ✅ |
@@ -36,12 +39,13 @@ SDK는 [`docs/03-plugin-sdk.md`](docs/03-plugin-sdk.md)를 참고하세요.
 | 렌더러 | WebGL2 컴포지터, ping-pong FBO, 다중 패스 이펙트 체인, 키프레임 보간 |
 | 이펙트 | GPU/오디오 이펙트 24종, 1D/3D `.cube` LUT, 벡터 마스크, 블렌드 모드, 배경 제거 |
 | 텍스트 | Canvas2D 렌더 텍스트 클립(크기/색/배경 조절) + 전용 자막 트랙 |
-| 미디어 | OPFS 기반 자산, 썸네일/파형 분석, 드래그-드롭 입수 |
-| AI (전부 로컬) | 자동 묵음 컷(WebAudio RMS), Whisper 자막(HuggingFace), 장면 감지(χ²), 배경 제거(MediaPipe Selfie) |
+| 미디어 | OPFS 기반 자산, 썸네일/필름스트립/파형 분석, 진행률·중단 지원 대량 드래그-드롭 입수, 프록시, 썸네일 크기 조절, 마퀴 다중 선택, 사용/제외 지정, 자산별 사용 구간 지정 |
+| AI (전부 로컬) | 자동 묵음 컷(WebAudio RMS), Whisper 자막(HuggingFace), 장면 감지(χ²), 배경 제거(MediaPipe Selfie), 미소 감지(FaceLandmarker), 선택형 시맨틱 태그/중복 제거(MobileCLIP) |
+| 자동 편집 | 여행/풍경 영상용 6단계 마법사: 불량 컷 필터(흐림/노출/흔들림), 흥미도 스코어링, 비트 그리드 조립 + 포토 스택/Ken Burns, GPS·날짜 기반 스토리 챕터(오프라인 지오코딩), 지도 이동 클립 렌더링, YouTube 오디오 라이브러리/Suno 음악 플로우, 음악 교체 시 비트-스냅 재정렬 — 전용 AUTO 트랙에 실행취소 1회로 적용 |
 | 내보내기 | WebCodecs H.264/VP9/AV1 + 스테레오 AAC, LUFS 정규화, 작업 구간, 4종 프리셋 |
 | 영속화 | 검증된 프로젝트 라이브러리·스냅샷, Yjs/IndexedDB 상태, OPFS 미디어, 손상 복구 |
 | 협업 | 설정 가능한 y-websocket 룸, 연결 상태, CRDT 편집, awareness, 피어 미디어 전송 |
-| 플러그인 SDK | `window.cutEditor.registerEffect` + `registerShader`, `localStorage["cut.plugins"]`로 URL 로드 |
+| 플러그인 SDK | 네트워크 격리 샌드박스 iframe에서 URL 로드되는 v2 이펙트, 선언형 uniform |
 | 모바일 | 반응형 셸 + 드로어 패널 + 투핑거 핀치 줌 |
 
 ## 저장소 구조
@@ -63,10 +67,14 @@ pnpm dev          # http://localhost:3000
 
 실시간 협업은 릴레이 서버를 설정하기 전까지 비활성화됩니다.
 `apps/web/.env.example`을 `apps/web/.env.local`로 복사하고
-`NEXT_PUBLIC_COLLAB_WS_URL`에 자체 y-websocket 주소를 설정하세요. 원격 서버는
-`wss://`가 필수이며 로컬 개발에서는 `ws://localhost:1234`를 사용할 수 있습니다.
-데스크톱 릴리스 빌드는 GitHub Actions 저장소 변수 `COLLAB_WS_URL`에서 같은
-주소를 읽습니다.
+`NEXT_PUBLIC_COLLAB_WS_URL`에 자체 릴레이 주소를 설정하세요. 원격 서버는
+`wss://`가 필수이며 `NEXT_PUBLIC_COLLAB_TICKET_URL`도 함께 필요합니다. 로컬
+개발에서는 티켓 없이 `ws://localhost:1234`를 사용할 수 있습니다. 동봉된
+프로덕션 릴레이는 단기 룸 티켓을 검증하고 Origin/페이로드/속도 제한을
+적용합니다. 자세한 내용은
+[`docs/05-collaboration-deployment.md`](docs/05-collaboration-deployment.md)
+참고. 데스크톱 릴리스 빌드는 GitHub Actions 저장소 변수 `COLLAB_WS_URL`과
+`COLLAB_TICKET_URL`에서 같은 주소를 읽습니다.
 
 요구사항: Node 20+, pnpm 9+.
 
@@ -83,8 +91,9 @@ IndexedDB 프로젝트 복원, 두 브라우저 간 CRDT 편집과 수신 브라
 
 ## macOS 앱으로 설치하기
 
-cut_editor는 PWA manifest + 서비스 워커를 동봉하므로 별도 도구 없이 독립
-데스크톱 윈도우로 설치할 수 있습니다.
+Reelog는 PWA manifest + 서비스 워커를 동봉하므로 별도 도구 없이 독립
+데스크톱 윈도우로 설치할 수 있습니다. 네이티브 앱이 필요하면
+[Releases 페이지](../../releases/latest)에서 빌드된 `.dmg`를 받으세요.
 
 **Safari (macOS 권장)**
 
@@ -132,15 +141,15 @@ gitignore되어 있으므로 새로운 체크아웃마다 또는 데스크톱 �
 **태그 릴리스 (권장)**
 
 ```bash
-# 1. apps/desktop/package.json 의 version 을 올립니다 (예: 0.1.0 → 0.1.1).
+# 1. apps/desktop/package.json 의 version 을 올립니다 (예: 0.2.2 → 0.2.3).
 #    이어서 push 할 태그와 같은 숫자여야 합니다.
 
 # 2. 버전 변경을 커밋.
-git commit -am "chore: bump desktop to 0.1.1"
+git commit -am "chore: bump desktop to 0.2.3"
 git push
 
 # 3. 태그 push — 이 시점에 워크플로가 발화합니다.
-git tag v0.1.1
+git tag v0.2.3
 git push --tags
 ```
 
@@ -158,7 +167,7 @@ workflow** 버튼. 현재 `apps/desktop/package.json` 의 version 값을 그대�
 않습니다. 첫 실행 전에 속성을 제거해야 합니다:
 
 ```bash
-xattr -cr /Applications/cut_editor.app
+xattr -cr /Applications/Reelog.app
 ```
 
 별도 안내 없이 바로 열리는 사이닝 + 공증된 `.dmg` 를 만들려면 Apple
@@ -166,7 +175,7 @@ Developer Secret 5개 (`CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`,
 `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`)를 리포지토리 Secrets 에
 추가하고 `identity: null` 줄을 제거하면 됩니다 — 워크플로 변경 불필요.
 
-## 로드맵 (v0.1 이후)
+## 로드맵 (v0.2 이후)
 
 - WebGPU 렌더러 (wgsl 셰이더, 플러그인 SDK v2)
 - 컴파운드/네스티드 시퀀스
