@@ -4,6 +4,7 @@ import { probeMedia } from "./probe";
 import { makeImageThumb, makeVideoThumb, makeVideoFilmstrip } from "./thumbnail";
 import { extractWaveformPeaks } from "./waveform";
 import { leaseMediaKey } from "@/persistence/media-gc";
+import { extractCaptureMeta } from "@/autoedit/metadata";
 
 export interface ImportResult {
   asset: MediaAsset;
@@ -43,6 +44,10 @@ export const importMediaFile = async (file: File): Promise<ImportResult> => {
       if (peaks) waveformPeaks = peaks;
     }
 
+    // Capture time + GPS for the auto-edit story engine (EXIF / mvhd / ISO6709).
+    // File.lastModified is the honest fallback when the container has no clock.
+    const capture = await extractCaptureMeta(file, probe.kind, file.lastModified);
+
     const asset: MediaAsset = {
       id,
       name: file.name,
@@ -53,6 +58,10 @@ export const importMediaFile = async (file: File): Promise<ImportResult> => {
       ...(probe.height !== undefined ? { height: probe.height } : {}),
       opfsPath,
       sizeBytes: file.size,
+      ...(capture.capturedAt !== undefined ? { capturedAt: capture.capturedAt } : {}),
+      ...(capture.gpsLat !== undefined && capture.gpsLon !== undefined
+        ? { gpsLat: capture.gpsLat, gpsLon: capture.gpsLon }
+        : {}),
       ...(thumbDataUrl ? { thumbDataUrl } : {}),
       ...(filmstripDataUrl ? { filmstripDataUrl } : {}),
       ...(filmstripFrames !== undefined ? { filmstripFrames } : {}),

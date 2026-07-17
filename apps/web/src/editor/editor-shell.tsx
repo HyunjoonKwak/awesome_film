@@ -13,6 +13,7 @@ import { usePluginHost } from "@/plugins/use-plugin-host";
 import { PreviewViewport } from "@/preview/preview-viewport";
 import { TransportBar } from "@/preview/transport-bar";
 import { useAudioPlayback } from "@/preview/use-audio-playback";
+import { useAutoAnalysis } from "@/autoedit/use-auto-analysis";
 import { useProjectStore } from "@/stores/project-store";
 import { TimelinePanel } from "@/timeline/components/timeline-panel";
 import { FolderOpen, Sliders, X } from "lucide-react";
@@ -30,6 +31,7 @@ export function EditorShell() {
   const persistenceReady = useCollab();
   usePluginHost();
   useAudioPlayback();
+  useAutoAnalysis();
   const isMobile = useIsBelow(900);
   const isDesktopApp = useIsDesktopApp();
 

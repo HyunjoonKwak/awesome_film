@@ -20,6 +20,11 @@ export interface MediaAsset {
   readonly proxyWidth?: number;    // proxy resolution
   readonly proxyHeight?: number;
   readonly thumbDataUrl?: string;  // small preview for media bin
+  readonly capturedAt?: number;    // capture time (EXIF DateTimeOriginal / mvhd
+                                   // creation_time), epoch ms; import falls back
+                                   // to File.lastModified when absent
+  readonly gpsLat?: number;        // capture GPS, decimal degrees (EXIF / ISO6709)
+  readonly gpsLon?: number;
   readonly filmstripDataUrl?: string; // wide multi-frame strip over full source
   readonly filmstripFrames?: number;  // number of frames in the strip
   readonly waveformPeaks?: readonly number[]; // downsampled abs-max peaks

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Activity, Clapperboard, FileText, MapPin, ShieldCheck, Sliders } from "lucide-react";
+import { Activity, Clapperboard, FileText, MapPin, ShieldCheck, Sliders, Wand2 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { AutoEditPanel } from "@/autoedit/components/autoedit-panel";
 import { InspectorPanel } from "./inspector-panel";
 import { SubtitlePanel } from "@/subtitles/subtitle-panel";
 import { ScopesPanel } from "@/preview/scopes-panel";
@@ -11,7 +12,7 @@ import { MarkerPanel } from "./marker-panel";
 import { ProjectInspectorPanel } from "./project-inspector-panel";
 import { useT } from "@/i18n/use-t";
 
-type Tab = "inspector" | "subs" | "scopes" | "multicam" | "markers" | "inspect";
+type Tab = "inspector" | "auto" | "subs" | "scopes" | "multicam" | "markers" | "inspect";
 
 export function RightPanel() {
   const [tab, setTab] = useState<Tab>("inspector");
@@ -25,6 +26,12 @@ export function RightPanel() {
           onClick={() => setTab("inspector")}
           icon={<Sliders className="size-3.5" />}
           label={t("inspector.title")}
+        />
+        <TabButton
+          active={tab === "auto"}
+          onClick={() => setTab("auto")}
+          icon={<Wand2 className="size-3.5" />}
+          label={t("auto.tab")}
         />
         <TabButton
           active={tab === "subs"}
@@ -59,6 +66,7 @@ export function RightPanel() {
       </div>
       <div className="flex-1 overflow-hidden">
         {tab === "inspector" && <InspectorPanel />}
+        {tab === "auto" && <AutoEditPanel />}
         {tab === "subs" && <SubtitlePanel />}
         {tab === "scopes" && <ScopesPanel />}
         {tab === "multicam" && <MulticamPanel />}

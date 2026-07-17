@@ -76,6 +76,8 @@ interface ProjectStoreState {
 
   // mutations
   loadProject: (p: Project) => void;
+  // Commit a whole generated timeline (auto-edit) as ONE undoable command.
+  applyGenerated: (label: string, build: (p: Project) => Project) => void;
   renameProject: (name: string) => void;
   setResolution: (w: number, h: number) => void;
   addMediaAsset: (asset: MediaAsset) => void;
@@ -212,6 +214,8 @@ export const useProjectStore = create<ProjectStoreState>()(
     history: emptyHistory,
 
     loadProject: (p) => set({ project: p, history: emptyHistory }),
+
+    applyGenerated: (label, build) => runWith(set, label, build),
 
     renameProject: (name) =>
       runWith(set, "Rename project", (p) => ({ ...p, name: name.slice(0, 80) || "Untitled" })),
