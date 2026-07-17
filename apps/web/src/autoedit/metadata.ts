@@ -48,6 +48,32 @@ export const parseMvhdCreation = (bytes: Uint8Array): number | null => {
   return null;
 };
 
+// 3GPP `loci` box — ffmpeg writes `-metadata location=` here as BINARY
+// 16.16 fixed-point (longitude first), unlike iPhone's textual ©xyz ISO6709.
+// Layout after size+'loci': version(1) flags(3) language(2) name(cstr)
+// role(1) longitude(4) latitude(4) altitude(4) …
+export const parseLoci = (bytes: Uint8Array): { lat: number; lon: number } | null => {
+  const view = new DataView(bytes.buffer, bytes.byteOffset);
+  for (let i = 0; i + 4 <= bytes.length; i++) {
+    if (bytes[i] !== 0x6c || bytes[i + 1] !== 0x6f || bytes[i + 2] !== 0x63 || bytes[i + 3] !== 0x69)
+      continue; // 'loci'
+    let p = i + 4 + 4 + 2; // version/flags + language
+    // skip null-terminated name (bounded)
+    const nameEnd = Math.min(bytes.length, p + 256);
+    while (p < nameEnd && bytes[p] !== 0) p++;
+    p += 1; // NUL
+    p += 1; // role
+    if (p + 8 > bytes.length) continue;
+    const lon = view.getInt32(p) / 65536;
+    const lat = view.getInt32(p + 4) / 65536;
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    if (Math.abs(lat) > 90 || Math.abs(lon) > 180) continue;
+    if (lat === 0 && lon === 0) continue;
+    return { lat, lon };
+  }
+  return null;
+};
+
 export const findIso6709 = (bytes: Uint8Array): { lat: number; lon: number } | null => {
   // GPS strings live inside ©xyz / com.apple.quicktime.location atoms; a plain
   // latin1 sweep of the moov window is robust and dependency-free.
@@ -74,7 +100,7 @@ export const extractVideoMeta = async (blob: Blob, fallbackMs?: number): Promise
       blob.size > SCAN_BYTES ? await readWindow(blob, blob.size - SCAN_BYTES, blob.size) : head;
     const capturedAt =
       parseMvhdCreation(head) ?? parseMvhdCreation(tail) ?? fallbackMs ?? undefined;
-    const gps = findIso6709(head) ?? findIso6709(tail);
+    const gps = findIso6709(head) ?? findIso6709(tail) ?? parseLoci(head) ?? parseLoci(tail);
     return {
       ...(capturedAt !== undefined ? { capturedAt } : {}),
       ...(gps ? { gpsLat: gps.lat, gpsLon: gps.lon } : {}),
