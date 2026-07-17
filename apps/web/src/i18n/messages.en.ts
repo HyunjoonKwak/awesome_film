@@ -16,8 +16,14 @@ export const en = {
 
     // Collab bar
     "collab.share": "Share",
+    "collab.panelTitle": "Realtime co-editing",
+    "collab.panelDesc": "Send this room code to whoever you want to edit with. When you both join with the same code, you edit this project together in real time.",
+    "collab.join": "Join",
+    "collab.copy": "Copy room code",
+    "collab.copied": "Room code copied",
+    "collab.copyFailed": "Copy failed — select the code and copy it manually",
     "collab.leave": "Leave",
-    "collab.room": "room",
+    "collab.room": "Room code",
     "collab.connecting": "Connecting…",
     "collab.connected": "Connected",
     "collab.disconnected": "Reconnecting…",

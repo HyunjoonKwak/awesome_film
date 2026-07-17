@@ -70,8 +70,10 @@ test("synchronizes project edits between isolated browser sessions", async ({ br
     await Promise.all([page.goto("/editor"), peerPage.goto("/editor")]);
     const room = `e2e-${crypto.randomUUID()}`;
     for (const editorPage of [page, peerPage]) {
-      await editorPage.getByLabel("room").fill(room);
+      // The room code lives in a popover behind the Share button.
       await editorPage.getByRole("button", { name: "Share" }).click();
+      await editorPage.getByLabel("Room code", { exact: true }).fill(room);
+      await editorPage.getByRole("button", { name: "Join" }).click();
       await expect(editorPage.getByTestId("collab-status")).toHaveAttribute(
         "data-status",
         "connected",

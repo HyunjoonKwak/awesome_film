@@ -1,7 +1,7 @@
 "use client";
 
 import { useT } from "@/i18n/use-t";
-import { LogOut, Share2 } from "lucide-react";
+import { Copy, LogOut, Share2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAwarenessStore } from "./awareness-store";
@@ -27,6 +27,35 @@ export function CollabBar() {
   const [room, setRoom] = useState(() => `cut-${crypto.randomUUID()}`);
   const t = useT();
   const previousStatus = useRef(connectionStatus);
+
+  // The room code lives in a popover behind the Share button — hidden until
+  // the user actually wants to co-edit, with an explanation of what it's for.
+  const [panelOpen, setPanelOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!panelOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!panelRef.current?.contains(e.target as Node)) setPanelOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPanelOpen(false);
+    };
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [panelOpen]);
+
+  const copyRoomCode = async () => {
+    try {
+      await navigator.clipboard.writeText(room);
+      toast.success(t("collab.copied"));
+    } catch {
+      toast.error(t("collab.copyFailed"));
+    }
+  };
 
   useEffect(() => {
     if (connectionStatus === "connected" && previousStatus.current !== "connected" && joinedRoom) {
@@ -79,6 +108,7 @@ export function CollabBar() {
         token = payload.token;
       }
       getBridge().joinRoom(server.url, roomName, token);
+      setPanelOpen(false);
     } catch (err) {
       toast.error(
         t("collab.joinFailed", { msg: err instanceof Error ? err.message : String(err) }),
@@ -146,24 +176,58 @@ export function CollabBar() {
           </button>
         </>
       ) : (
-        <>
-          <input
-            value={room}
-            onChange={(e) => setRoom(e.target.value)}
-            placeholder={t("collab.room")}
-            aria-label={t("collab.room")}
-            className="w-24 rounded bg-white/5 px-2 py-1 text-xs text-ink-1 outline-none focus:bg-white/10"
-          />
+        <div className="relative" ref={panelRef}>
           <button
             type="button"
-            onClick={() => void join()}
+            onClick={() => setPanelOpen((open) => !open)}
             className="btn-ghost px-2 py-1 text-xs"
-            title={t("collab.share")}
+            title={t("collab.panelTitle")}
+            aria-expanded={panelOpen}
           >
             <Share2 className="size-3.5" />
             {t("collab.share")}
           </button>
-        </>
+          {panelOpen && (
+            <div className="absolute right-0 top-full z-50 mt-1.5 w-72 rounded-lg border border-white/10 bg-panel-2 p-3 shadow-xl">
+              <p className="text-xs font-medium text-ink-1">{t("collab.panelTitle")}</p>
+              <p className="mt-1 text-2xs leading-relaxed text-ink-3">{t("collab.panelDesc")}</p>
+              <label className="mt-2.5 block">
+                <span className="text-3xs uppercase tracking-wider text-ink-3">
+                  {t("collab.room")}
+                </span>
+                <div className="mt-1 flex items-center gap-1">
+                  <input
+                    value={room}
+                    onChange={(e) => setRoom(e.target.value)}
+                    aria-label={t("collab.room")}
+                    className="min-w-0 flex-1 rounded bg-white/5 px-2 py-1 font-mono text-2xs text-ink-1 outline-none focus:bg-white/10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void copyRoomCode()}
+                    className="btn-ghost p-1.5"
+                    title={t("collab.copy")}
+                    aria-label={t("collab.copy")}
+                  >
+                    <Copy className="size-3.5" />
+                  </button>
+                </div>
+              </label>
+              {!configuredCollabServer().ok && (
+                <p className="mt-2 text-3xs leading-relaxed text-amber-300">
+                  {t("collab.serverMissing")}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => void join()}
+                className="mt-2.5 w-full rounded bg-accent px-2 py-1.5 text-xs font-medium text-accent-fg hover:opacity-90"
+              >
+                {t("collab.join")}
+              </button>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

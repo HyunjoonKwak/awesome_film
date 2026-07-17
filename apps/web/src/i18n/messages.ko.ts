@@ -16,6 +16,12 @@ export const ko = {
 
     // Collab bar
     "collab.share": "공유",
+    "collab.panelTitle": "실시간 공동 편집",
+    "collab.panelDesc": "아래 방 코드를 함께 편집할 사람에게 보내세요. 서로 같은 코드로 참가하면 이 프로젝트를 실시간으로 같이 편집합니다.",
+    "collab.join": "참가",
+    "collab.copy": "방 코드 복사",
+    "collab.copied": "방 코드를 복사했습니다",
+    "collab.copyFailed": "복사에 실패했습니다 — 코드를 직접 선택해 복사하세요",
     "collab.leave": "나가기",
     "collab.room": "방 코드",
     "collab.connecting": "연결 중…",
