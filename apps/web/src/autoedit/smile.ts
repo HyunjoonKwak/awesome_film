@@ -54,13 +54,29 @@ const getLandmarker = (): Promise<Landmarker | null> => {
   return landmarkerPromise;
 };
 
+// MediaPipe's wasm emits its startup INFO lines ("Created TensorFlow Lite
+// XNNPACK delegate…") through console.error, which Next's dev overlay surfaces
+// as a red error. Filter exactly those lines for the synchronous detect scope.
+const withMediapipeLogFilter = <T>(fn: () => T): T => {
+  const original = console.error;
+  console.error = (...args: unknown[]) => {
+    if (typeof args[0] === "string" && args[0].startsWith("INFO: ")) return;
+    original(...args);
+  };
+  try {
+    return fn();
+  } finally {
+    console.error = original;
+  }
+};
+
 export const scoreSmiles = async (
   images: readonly ImageData[],
 ): Promise<readonly SmileSample[] | null> => {
   const lm = await getLandmarker();
   if (!lm) return null;
   try {
-    return images.map((img) => {
+    return withMediapipeLogFilter(() => images.map((img) => {
       const res = lm.detect(img);
       let smile = 0;
       for (const face of res.faceBlendshapes ?? []) {
@@ -92,7 +108,7 @@ export const scoreSmiles = async (
         }
       }
       return { smile, faceArea, faceCx };
-    });
+    }));
   } catch {
     return null;
   }
