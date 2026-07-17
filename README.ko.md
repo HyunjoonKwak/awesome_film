@@ -153,8 +153,14 @@ git tag v0.2.3
 git push --tags
 ```
 
-약 15분 후 동일 이름의 GitHub Release 에 `.dmg` 두 개(`-arm64` / Intel)와
-`latest-mac.yml` 이 함께 업로드됩니다(자동 업데이터가 같은 경로를 봅니다).
+약 15분 후 동일 이름의 GitHub Release 에 `.dmg` 두 개(`-arm64` / Intel)가
+업로드됩니다.
+
+설치된 앱은 실행 시(그리고 4시간마다, 또는 **Reelog → 업데이트 확인…**
+메뉴로) Releases API를 확인해 새 버전이 있으면 다이얼로그를 띄웁니다 —
+다운로드를 누르면 브라우저에서 아키텍처에 맞는 `.dmg`를 받습니다. 미서명
+빌드는 자체 설치가 불가능하므로 설치는 기존처럼 Applications에 드래그하는
+방식입니다.
 
 **임시 빌드** — GitHub 리포지토리 → **Actions** → **Release** → **Run
 workflow** 버튼. 현재 `apps/desktop/package.json` 의 version 값을 그대로

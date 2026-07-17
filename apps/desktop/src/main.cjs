@@ -8,6 +8,7 @@
 const { app, BrowserWindow, Menu, dialog, ipcMain, protocol, session, shell } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
+const { checkForUpdates, scheduleStartupCheck, runSmokeCheck } = require("./updater.cjs");
 
 const isDev = !!process.env.CUT_DEV_URL;
 const DEV_URL = process.env.CUT_DEV_URL ?? "http://localhost:3000/editor";
@@ -231,6 +232,13 @@ const installDevHeaders = () => {
 const buildMenu = (win) => {
   const isMac = process.platform === "darwin";
   const send = (channel) => () => win.webContents.send(channel);
+  const checkUpdatesLabel = app.getLocale().toLowerCase().startsWith("ko")
+    ? "업데이트 확인…"
+    : "Check for Updates…";
+  const checkUpdatesItem = {
+    label: checkUpdatesLabel,
+    click: () => void checkForUpdates(win, { interactive: true }),
+  };
   const template = [
     ...(isMac
       ? [
@@ -238,6 +246,7 @@ const buildMenu = (win) => {
             label: app.name,
             submenu: [
               { role: "about" },
+              checkUpdatesItem,
               { type: "separator" },
               { role: "services" },
               { type: "separator" },
@@ -304,41 +313,11 @@ const buildMenu = (win) => {
           label: "Project on GitHub",
           click: () => shell.openExternal("https://github.com/HyunjoonKwak/awesome_film"),
         },
+        ...(isMac ? [] : [checkUpdatesItem]),
       ],
     },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
-};
-
-// Auto-update via electron-updater + the GitHub Releases publish target
-// configured in electron-builder.yml. Disabled in dev (no installed app to
-// replace) and on unsigned macOS bundles (Apple Squirrel refuses unsigned
-// upgrades), but the check is cheap enough to attempt — failures log and
-// move on, never blocking startup.
-const setupAutoUpdater = () => {
-  if (isDev) return;
-  try {
-    const { autoUpdater } = require("electron-updater");
-    autoUpdater.autoDownload = true;
-    autoUpdater.autoInstallOnAppQuit = true;
-    autoUpdater.on("error", (err) => {
-      // biome-ignore lint/suspicious/noConsole: Auto-updater diagnostics run outside the renderer UI.
-      console.warn("[cut-desktop] auto-update error:", err?.message ?? err);
-    });
-    autoUpdater.on("update-available", (info) => {
-      // biome-ignore lint/suspicious/noConsole: Auto-updater diagnostics run outside the renderer UI.
-      console.log("[cut-desktop] update available:", info?.version);
-    });
-    autoUpdater.on("update-downloaded", (info) => {
-      // biome-ignore lint/suspicious/noConsole: Auto-updater diagnostics run outside the renderer UI.
-      console.log("[cut-desktop] update downloaded:", info?.version, "— will install on quit");
-    });
-    // Defer the check briefly so the window is up first.
-    setTimeout(() => autoUpdater.checkForUpdatesAndNotify().catch(() => {}), 3000);
-  } catch (err) {
-    // biome-ignore lint/suspicious/noConsole: Missing updater support must remain visible in desktop logs.
-    console.warn("[cut-desktop] electron-updater unavailable:", err?.message ?? err);
-  }
 };
 
 // IPC: native save dialog used by the export pipeline. The renderer hands
@@ -363,11 +342,16 @@ ipcMain.handle("cut:save-export", async (event, payload) => {
 });
 
 app.whenReady().then(() => {
+  // CUT_UPDATE_SMOKE=1 drives the update check once and exits (no window).
+  if (process.env.CUT_UPDATE_SMOKE === "1") {
+    void runSmokeCheck();
+    return;
+  }
   installDevHeaders();
   if (!isDev) installAppProtocol();
   const win = createWindow();
   buildMenu(win);
-  setupAutoUpdater();
+  scheduleStartupCheck(win);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

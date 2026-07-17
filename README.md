@@ -158,8 +158,12 @@ git push --tags
 ```
 
 About 15 minutes later the matching GitHub Release has both `.dmg`s
-(`-arm64` and Intel) attached, plus `latest-mac.yml` so the built-in
-auto-updater can find them.
+(`-arm64` and Intel) attached.
+
+Installed apps check the Releases API on launch (and every 4 hours, or via
+**Reelog → Check for Updates…**) and show a dialog when a newer version
+exists — Download opens the matching `.dmg` in the browser. Unsigned builds
+cannot self-install, so installation stays a drag-to-Applications step.
 
 **Ad-hoc build** — open the GitHub repo → **Actions** → **Release** →
 **Run workflow**. Uses the current `apps/desktop/package.json` version.

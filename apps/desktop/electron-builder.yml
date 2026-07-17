@@ -47,9 +47,11 @@ dmg:
       type: link
       path: /Applications
 
-# Auto-update feed. electron-builder writes `latest-mac.yml` + the .dmg to
-# the GitHub Release matching the version in apps/desktop/package.json;
-# electron-updater in main.cjs reads back from the same repo. Set
+# Release upload target. electron-builder writes the .dmg files (plus
+# `latest-mac.yml`) to the GitHub Release matching the version in
+# apps/desktop/package.json. The in-app update check (src/updater.cjs) reads
+# the same repo's releases/latest API and offers the .dmg download — unsigned
+# builds cannot self-install, so installation stays a manual download. Set
 # `GH_TOKEN` to a personal access token with `repo` scope before running
 # `pnpm --filter @cut/desktop exec electron-builder --mac --publish=always`.
 publish:
