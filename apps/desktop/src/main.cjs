@@ -144,6 +144,9 @@ const createWindow = () => {
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      // Hand the app version to the sandboxed preload synchronously so the
+      // web top bar can show it from the first paint.
+      additionalArguments: [`--reelog-version=${app.getVersion()}`],
     },
   });
   if (state?.maximized) win.maximize();

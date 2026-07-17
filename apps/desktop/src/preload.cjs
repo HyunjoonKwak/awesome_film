@@ -15,9 +15,14 @@ const forward = (channel, eventName) => {
 forward("menu:export", "cut:menu-export");
 forward("menu:snapshot", "cut:menu-snapshot");
 
+// The installed app's version, passed by main.cjs via additionalArguments.
+const versionArg = process.argv.find((arg) => arg.startsWith("--reelog-version="));
+
 contextBridge.exposeInMainWorld("cutDesktop", {
   // Marker the web app can check to enable desktop-only paths if needed.
   isDesktop: true,
+  // App version shown in the web top bar (e.g. "0.2.3").
+  version: versionArg ? versionArg.slice("--reelog-version=".length) : null,
   // Native save dialog → returns the chosen file path, or null on cancel.
   // Accepts a Uint8Array of encoded bytes; the main process writes the file.
   saveExport: async (payload) => ipcRenderer.invoke("cut:save-export", payload),

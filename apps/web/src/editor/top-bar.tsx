@@ -13,6 +13,7 @@ import { ProjectMenu } from "./project-menu";
 import { SnapshotMenu } from "./snapshot-menu";
 import { useT } from "@/i18n/use-t";
 import { LanguageToggle } from "@/i18n/language-toggle";
+import { useAppVersion } from "@/hooks/use-app-version";
 
 export function TopBar() {
   const projectName = useProjectStore((s) => s.project.name);
@@ -27,6 +28,7 @@ export function TopBar() {
   const [draftName, setDraftName] = useState(projectName);
   useEffect(() => setDraftName(projectName), [projectName]);
   const t = useT();
+  const appVersion = useAppVersion();
 
   // Surface the active project in the window / tab title. Next.js can apply
   // streamed route metadata AFTER hydration, clobbering a one-shot assignment
@@ -84,7 +86,10 @@ export function TopBar() {
           }}
           className="rounded bg-transparent px-1 text-sm font-medium text-ink-1 outline-none hover:bg-white/5 focus:bg-white/10"
         />
-        <span className="text-xs text-ink-3">Reelog</span>
+        <span className="text-xs text-ink-3">
+          Reelog
+          {appVersion && <span className="ml-1 font-mono text-3xs">v{appVersion}</span>}
+        </span>
         <SaveBadge state={saveState} lastSavedAt={lastSavedAt} />
       </div>
 

@@ -1,7 +1,22 @@
+import { readFileSync } from "node:fs";
+
 /** @type {import('next').NextConfig} */
 const isExport = process.env.NEXT_OUTPUT === "export";
 
+// Product version single source: apps/desktop/package.json. Baked in at build
+// time for browser/PWA use; the Electron bridge (window.cutDesktop.version)
+// overrides it at runtime in the desktop app.
+const appVersion = (() => {
+  try {
+    return JSON.parse(readFileSync(new URL("../desktop/package.json", import.meta.url), "utf8"))
+      .version;
+  } catch {
+    return "";
+  }
+})();
+
 const nextConfig = {
+  env: { NEXT_PUBLIC_APP_VERSION: appVersion },
   reactStrictMode: true,
   // Playwright starts a Turbopack dev server after the production build in CI.
   // Keep those incompatible caches separate so the dev server never tries to
