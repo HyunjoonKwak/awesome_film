@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { useProjectStore } from "@/stores/project-store";
 import { useTimelineUiStore } from "@/stores/timeline-ui-store";
 import { useMediaImport } from "@/media/hooks";
+import { useImportProgressStore } from "@/media/import-progress-store";
 import { cn } from "@/lib/cn";
 import { useT } from "@/i18n/use-t";
 import type { MediaAsset, MediaKind } from "@cut/core";
@@ -148,6 +149,8 @@ export function MediaBin() {
           {t("media.import")}
         </button>
       </div>
+
+      <ImportProgress />
 
       {media.length > 0 && (
         <div className="space-y-2 px-2 pb-2">
@@ -318,6 +321,38 @@ export function MediaBin() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// 대량 가져오기 진행률 + 중단. hooks.ts의 임포트 루프가 파일 단위로 갱신하며,
+// 중단 요청 시 남은 파일을 건너뛴다 (이미 완료된 파일은 유지).
+function ImportProgress() {
+  const t = useT();
+  const { active, total, done, failed, currentName, cancelRequested, requestCancel } =
+    useImportProgressStore();
+  if (!active) return null;
+  const processed = done + failed;
+  const pct = total > 0 ? Math.round((processed / total) * 100) : 0;
+  return (
+    <div className="mx-2 mb-2 rounded border border-accent/30 bg-accent/10 p-2 text-2xs">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-medium text-ink-1">
+          {t("media.importProgress", { done: processed, total })}
+        </span>
+        <button
+          type="button"
+          onClick={requestCancel}
+          disabled={cancelRequested}
+          className="rounded border border-white/15 px-1.5 py-0.5 text-3xs text-ink-1 hover:border-red-400/60 hover:text-red-300 disabled:opacity-50"
+        >
+          {cancelRequested ? t("media.importStopping") : t("media.importStop")}
+        </button>
+      </div>
+      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
+        <div className="h-full bg-accent transition-[width]" style={{ width: `${pct}%` }} />
+      </div>
+      <p className="mt-1 truncate text-ink-3">{currentName}</p>
     </div>
   );
 }

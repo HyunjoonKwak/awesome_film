@@ -468,4 +468,10 @@ export const en = {
     "auto.semanticLoading": "Downloading semantic model…",
     "auto.semanticReady": "Semantic analysis enabled — re-analyzing",
     "auto.semanticFailed": "Could not load the semantic model (offline?)",
+    "media.importProgress": "Importing {done}/{total}",
+    "media.importStop": "Stop",
+    "media.importStopping": "Stopping…",
+    "media.importCancelled": "Import stopped — {done} done, {skipped} skipped",
+    "media.importedPartial": "{done} done, {failed} failed",
+    "media.importBusy": "An import is already in progress",
 } as const;

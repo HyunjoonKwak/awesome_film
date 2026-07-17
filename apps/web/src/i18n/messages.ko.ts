@@ -468,4 +468,10 @@ export const ko = {
     "auto.semanticLoading": "시맨틱 모델 내려받는 중…",
     "auto.semanticReady": "시맨틱 분석이 켜졌습니다 — 재분석을 시작합니다",
     "auto.semanticFailed": "시맨틱 모델을 불러오지 못했습니다 (오프라인?)",
+    "media.importProgress": "가져오는 중 {done}/{total}",
+    "media.importStop": "중단",
+    "media.importStopping": "중단 중…",
+    "media.importCancelled": "가져오기 중단 — {done}개 완료, {skipped}개 건너뜀",
+    "media.importedPartial": "{done}개 완료, {failed}개 실패",
+    "media.importBusy": "이미 가져오기가 진행 중입니다",
 } as const;
