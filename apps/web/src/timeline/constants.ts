@@ -8,3 +8,6 @@ const PX_PER_MS_MIN = 0.005;
 const PX_PER_MS_MAX = 1;
 
 export const clampZoom = (z: number): number => Math.min(PX_PER_MS_MAX, Math.max(PX_PER_MS_MIN, z));
+
+// One zoom-in/out step — shared by the toolbar buttons and Cmd+= / Cmd+-.
+export const ZOOM_STEP = 1.4;

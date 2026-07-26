@@ -41,7 +41,9 @@ export function TimelineTrack({ track, width }: Props) {
       const p = useProjectStore.getState().project;
       // Magnetise to clip edges / markers / playhead, frame-snap, then
       // clamp into a free gap (clips never overlap).
-      const snapped = snapToNearest(raw, collectSnapPoints(p.timeline), 8 / Math.max(zoom, 0.001));
+      const snapped = useTimelineUiStore.getState().snapEnabled
+        ? snapToNearest(raw, collectSnapPoints(p.timeline), 8 / Math.max(zoom, 0.001))
+        : raw;
       const framed = snapMsToFrame(snapped, p.framerate);
       const current = p.timeline.tracks.find((t) => t.id === track.id);
       return current ? resolvePlacement(current.clips, durationMs, framed) : framed;

@@ -6,6 +6,7 @@ import {
   type Clip,
   type ClipMask,
   type ClipTransform,
+  type ClipboardEntry,
   type CommandHistory,
   type EasingFn,
   type ID,
@@ -32,6 +33,7 @@ import {
   groupClips,
   magneticMove,
   moveClipOrGroup,
+  pasteClips,
   recordApplied,
   redo as redoHistory,
   removeClip,
@@ -134,7 +136,9 @@ interface ProjectStoreState {
   toggleTrackSolo: (trackId: ID) => void;
   addClipToTrack: (trackId: ID, clip: Clip) => void;
   removeClipById: (clipId: ID) => void;
+  removeClipsById: (clipIds: readonly ID[]) => void;
   rippleDeleteById: (clipId: ID) => void;
+  rippleDeleteClipsById: (clipIds: readonly ID[]) => void;
   closeGapsForClip: (clipId: ID) => void;
   slipClipBy: (clipId: ID, deltaMs: Ms) => void;
   rollEditBy: (clipId: ID, deltaMs: Ms) => void;
@@ -148,7 +152,7 @@ interface ProjectStoreState {
   ) => void;
   toggleClipDisabledById: (clipId: ID) => void;
   toggleFreezeAtPlayhead: (clipId: ID) => void;
-  moveClipBy: (clipId: ID, deltaMs: Ms) => void;
+  nudgeClipsBy: (clipIds: readonly ID[], deltaMs: Ms) => void;
   // Drag session — transient magnetic moves committed as ONE undo step.
   beginClipDrag: () => void;
   dragClipTo: (clipId: ID, targetStartMs: Ms) => void;
@@ -169,6 +173,7 @@ interface ProjectStoreState {
   setTransitionInFor: (clipId: ID, transition: Transition | undefined) => void;
   setTransitionOutFor: (clipId: ID, transition: Transition | undefined) => void;
   duplicateClipById: (clipId: ID) => void;
+  pasteClipsAt: (entries: readonly ClipboardEntry[], atMs: Ms) => void;
   reorderEffectById: (clipId: ID, effectId: ID, toIndex: number) => void;
   addMarkerAt: (atMs: Ms, label?: string) => void;
   removeMarkerById: (markerId: ID) => void;
@@ -249,7 +254,10 @@ export const useProjectStore = create<ProjectStoreState>()(
       if (!clip) return;
       const target = Math.max(0, targetStartMs);
       const tol = 8 / Math.max(before.timeline.zoom, 0.001);
-      const snapped = snapClipStart(before.timeline, clip, target, { toleranceMs: tol });
+      const snapping = useTimelineUiStore.getState().snapEnabled;
+      const snapped = snapping
+        ? snapClipStart(before.timeline, clip, target, { toleranceMs: tol })
+        : target;
       useTimelineUiStore.getState().setSnapMs(snapped !== target ? snapped : null);
       const framed = snapMsToFrame(snapped, before.framerate);
       if (clip.groupId) {
@@ -281,32 +289,41 @@ export const useProjectStore = create<ProjectStoreState>()(
       set((s) => ({ history: recordApplied(before, after, s.history, "Move clip") }));
     },
 
-    moveClipBy: (clipId, deltaMs) => {
-      // Pre-compute the snap so the transient snap-guide store can light up
-      // the matched edge while the drag is in flight.
-      const pre = get().project;
-      const preClip = findClip(pre.timeline, clipId);
-      if (!preClip) return;
-      const candidate = Math.max(0, preClip.start + deltaMs);
-      // Snap tolerance: 8px in current zoom (frames are ~33ms @ 30fps)
-      const toleranceMs = 8 / Math.max(pre.timeline.zoom, 0.001);
-      const snappedPre = snapClipStart(pre.timeline, preClip, candidate, { toleranceMs });
-      useTimelineUiStore.getState().setSnapMs(snappedPre !== candidate ? snappedPre : null);
+    // Keyboard nudge (`,`/`.`/arrows): one undoable command for the whole
+    // selection, no edge snapping — a one-frame nudge must never
+    // re-magnetise to the edge it just left (snap tolerance can exceed a
+    // frame at low zoom).
+    nudgeClipsBy: (clipIds, deltaMs) => {
+      if (clipIds.length === 0 || deltaMs === 0) return;
       runWith(set, "Move clip", (p) => {
-        const clip = findClip(p.timeline, clipId);
-        if (!clip) return p;
-        const target = Math.max(0, clip.start + deltaMs);
-        const tol = 8 / Math.max(p.timeline.zoom, 0.001);
-        const snapped = snapClipStart(p.timeline, clip, target, { toleranceMs: tol });
-        // Grouped clips move rigidly together by the snapped delta.
-        if (clip.groupId) return moveClipOrGroup(p, clipId, snapped - clip.start);
-        // Magnetic rule: clips on a track never overlap — clamp into the
-        // nearest free gap.
-        const track = p.timeline.tracks.find((t) => t.clips.some((c) => c.id === clipId));
-        const resolved = track
-          ? resolvePlacement(track.clips, clip.duration, snapped, clipId)
-          : snapped;
-        return updateClip(p, clipId, (c) => ({ ...c, start: resolved }));
+        // A group moves once, not once per selected member. Process in
+        // timeline order — trailing clip first when moving right — so
+        // adjacent selected clips don't collide and tear apart.
+        const seen = new Set<ID>();
+        const targets = p.timeline.tracks
+          .flatMap((t) => t.clips)
+          .filter((c) => clipIds.includes(c.id))
+          .sort((a, b) => (deltaMs > 0 ? b.start - a.start : a.start - b.start))
+          .filter((c) => {
+            const key = c.groupId ?? c.id;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+        return targets.reduce((proj, t) => {
+          const clip = findClip(proj.timeline, t.id);
+          if (!clip) return proj;
+          const target = Math.max(0, clip.start + deltaMs);
+          // Grouped clips move rigidly together by the delta.
+          if (clip.groupId) return moveClipOrGroup(proj, t.id, target - clip.start);
+          // Magnetic rule: clips on a track never overlap — clamp into the
+          // nearest free gap.
+          const track = proj.timeline.tracks.find((tr) => tr.clips.some((c) => c.id === t.id));
+          const resolved = track
+            ? resolvePlacement(track.clips, clip.duration, target, t.id)
+            : target;
+          return updateClip(proj, t.id, (c) => ({ ...c, start: resolved }));
+        }, p);
       });
     },
 
@@ -316,7 +333,19 @@ export const useProjectStore = create<ProjectStoreState>()(
 
     removeClipById: (clipId) => runWith(set, "Delete clip", (p) => removeClip(p, clipId)),
 
+    removeClipsById: (clipIds) => {
+      if (clipIds.length === 0) return;
+      runWith(set, "Delete clips", (p) => clipIds.reduce((proj, id) => removeClip(proj, id), p));
+    },
+
     rippleDeleteById: (clipId) => runWith(set, "Ripple delete", (p) => rippleDeleteClip(p, clipId)),
+
+    rippleDeleteClipsById: (clipIds) => {
+      if (clipIds.length === 0) return;
+      runWith(set, "Ripple delete", (p) =>
+        clipIds.reduce((proj, id) => rippleDeleteClip(proj, id), p),
+      );
+    },
 
     closeGapsForClip: (clipId) =>
       runWith(set, "Close gaps", (p) => {
@@ -412,6 +441,18 @@ export const useProjectStore = create<ProjectStoreState>()(
       runWith(set, "Set transition out", (p) => setTransitionOut(p, clipId, transition)),
 
     duplicateClipById: (clipId) => runWith(set, "Duplicate clip", (p) => duplicateClip(p, clipId)),
+
+    // No history entry when nothing pastes (e.g. the source tracks are gone
+    // after a project switch) — a phantom undo step would also clear redo.
+    pasteClipsAt: (entries, atMs) =>
+      set((s) => {
+        const after = pasteClips(s.project, entries, atMs);
+        if (after === s.project) return {};
+        return {
+          project: after,
+          history: recordApplied(s.project, after, s.history, "Paste clips"),
+        };
+      }),
 
     setClipSpeed: (clipId, speed) =>
       runWith(set, "Set speed", (p) =>

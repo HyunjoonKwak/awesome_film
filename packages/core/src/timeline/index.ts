@@ -1,4 +1,5 @@
 export * from "./query";
+export * from "./edit-points";
 export * from "./mutate";
 export * from "./split";
 export * from "./snap";

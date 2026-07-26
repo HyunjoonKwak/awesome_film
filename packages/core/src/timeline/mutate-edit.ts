@@ -12,9 +12,28 @@ import { snapMsToFrame } from "../utils/time";
 import { dropKey, recompute } from "./mutate-internal";
 import { addClip, addTrack, moveClip, updateClip } from "./mutate-core";
 import { setAudioFade } from "./mutate-effect";
+import { resolvePlacement } from "./collide";
 
-// Ripple delete: remove the clip and pull every later clip on the same track
-// back by the deleted clip's duration, closing the gap it left behind.
+// Pull every clip starting at/after `from` back by `gap`, clamped so no
+// clip overlaps the one before it (left-to-right cursor pass). Clips that
+// begin before `from` — including ones straddling it — stay put.
+const rippleTrackClips = (clips: readonly Clip[], from: Ms, gap: Ms): readonly Clip[] => {
+  const sorted = [...clips].sort((a, b) => a.start - b.start);
+  let cursor: Ms = 0;
+  return sorted.map((c) => {
+    if (c.start < from) {
+      cursor = Math.max(cursor, clipEnd(c));
+      return c;
+    }
+    const start = Math.max(0, Math.max(c.start - gap, cursor));
+    cursor = start + c.duration;
+    return start === c.start ? c : { ...c, start };
+  });
+};
+
+// Ripple delete (FCP magnetic default): remove the clip and pull every
+// later clip back by its duration on EVERY unlocked track, so parallel
+// audio/titles stay in sync with the video they were cut against.
 export const rippleDeleteClip = (project: Project, clipId: ID): Project => {
   let removed: Clip | null = null;
   let trackId: ID | null = null;
@@ -30,11 +49,9 @@ export const rippleDeleteClip = (project: Project, clipId: ID): Project => {
   const gap = removed.duration;
   const from = removed.start;
   const tracks = project.timeline.tracks.map((t) => {
-    if (t.id !== trackId) return t;
-    const clips = t.clips
-      .filter((c) => c.id !== clipId)
-      .map((c) => (c.start >= from ? { ...c, start: Math.max(0, c.start - gap) } : c));
-    return { ...t, clips };
+    if (t.locked && t.id !== trackId) return t;
+    const remaining = t.id === trackId ? t.clips.filter((c) => c.id !== clipId) : t.clips;
+    return { ...t, clips: rippleTrackClips(remaining, from, gap) };
   });
   return recompute({ ...project, timeline: { ...project.timeline, tracks } });
 };
@@ -247,6 +264,40 @@ export const duplicateClip = (project: Project, clipId: ID): Project => {
     return { ...tr, clips: next };
   });
   if (!inserted) return project;
+  return recompute({ ...project, timeline: { ...project.timeline, tracks } });
+};
+
+// One copied clip together with the track it was copied from, so paste can
+// put it back on the same track.
+export interface ClipboardEntry {
+  readonly trackId: ID;
+  readonly clip: Clip;
+}
+
+// FCP-style paste (Cmd+V): place copies at `atMs`, preserving the copied
+// clips' offsets relative to the earliest one. Copies get fresh ids, drop
+// group membership, frame-snap, and clamp into free gaps so nothing
+// overlaps. Entries whose track is gone or locked are skipped.
+export const pasteClips = (
+  project: Project,
+  entries: readonly ClipboardEntry[],
+  atMs: Ms,
+): Project => {
+  if (entries.length === 0) return project;
+  const minStart = entries.reduce((m, e) => Math.min(m, e.clip.start), Number.POSITIVE_INFINITY);
+  let tracks = project.timeline.tracks;
+  let pasted = false;
+  for (const { trackId, clip } of entries) {
+    const track = tracks.find((t) => t.id === trackId);
+    if (!track || track.locked) continue;
+    const target = Math.max(0, snapMsToFrame(atMs + clip.start - minStart, project.framerate));
+    const start = resolvePlacement(track.clips, clip.duration, target);
+    const copy = { ...dropKey(clip, "groupId"), id: newId(), start } as Clip;
+    const clips = [...track.clips, copy].sort((a, b) => a.start - b.start);
+    tracks = tracks.map((t) => (t.id === trackId ? { ...t, clips } : t));
+    pasted = true;
+  }
+  if (!pasted) return project;
   return recompute({ ...project, timeline: { ...project.timeline, tracks } });
 };
 

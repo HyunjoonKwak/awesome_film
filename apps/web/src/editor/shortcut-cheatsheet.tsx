@@ -6,24 +6,32 @@ import { useViewStore } from "@/stores/view-store";
 import { useT } from "@/i18n/use-t";
 import type { MessageKey } from "@/i18n/messages";
 
-const mod = typeof navigator !== "undefined" && /Mac/.test(navigator.platform) ? "⌘" : "Ctrl";
+const isMac = typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
+const mod = isMac ? "⌘" : "Ctrl";
+const ctl = isMac ? "⌃" : "Ctrl";
 
 const SHORTCUTS: readonly { keys: string; labelKey: MessageKey }[] = [
   { keys: "Space", labelKey: "sc.play" },
   { keys: "J K L", labelKey: "sc.shuttle" },
   { keys: "← →", labelKey: "sc.nudge" },
+  { keys: "↑ ↓", labelKey: "sc.editPoint" },
   { keys: "Home / End", labelKey: "sc.homeEnd" },
   { keys: "M", labelKey: "sc.marker" },
-  { keys: ", .", labelKey: "sc.markerNav" },
+  { keys: `${ctl} ; / ${ctl} '`, labelKey: "sc.markerNav" },
+  { keys: ", .", labelKey: "sc.nudgeClip" },
   { keys: "S", labelKey: "sc.split" },
   { keys: `${mod} B`, labelKey: "sc.blade" },
-  { keys: "Del", labelKey: "sc.delete" },
-  { keys: "⇧ Del", labelKey: "sc.rippleDelete" },
+  { keys: "⌫ / Del", labelKey: "sc.rippleDelete" },
+  { keys: "⇧ ⌫", labelKey: "sc.liftDelete" },
+  { keys: `${mod} C / X`, labelKey: "sc.copy" },
+  { keys: `${mod} V`, labelKey: "sc.paste" },
   { keys: `${mod} Z`, labelKey: "sc.undo" },
   { keys: `${mod} ⇧ Z`, labelKey: "sc.redo" },
   { keys: `${mod} A`, labelKey: "sc.selectAll" },
   { keys: `${mod} G`, labelKey: "sc.group" },
+  { keys: `${mod} = / −`, labelKey: "sc.zoom" },
   { keys: "⇧ Z", labelKey: "sc.zoomFit" },
+  { keys: "N", labelKey: "sc.snap" },
   { keys: "I / O", labelKey: "sc.inout" },
   { keys: "Esc", labelKey: "sc.clear" },
   { keys: "?", labelKey: "sc.help" },
