@@ -58,7 +58,6 @@ export function ProjectMenu() {
           project.resolution !== previous.resolution ||
           project.mediaLibrary !== previous.mediaLibrary ||
           project.timeline.tracks !== previous.timeline.tracks ||
-          project.timeline.magnetic !== previous.timeline.magnetic ||
           project.timeline.markers !== previous.timeline.markers;
         if (contentChanged) schedule(project);
       },

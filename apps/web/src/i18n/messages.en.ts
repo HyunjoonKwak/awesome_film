@@ -249,6 +249,7 @@ export const en = {
     "sc.snap": "Toggle snapping",
     "sc.copy": "Copy / cut selection",
     "sc.paste": "Paste at playhead",
+    "sc.threePoint": "Append / insert / overwrite / connect source",
     "sc.homeEnd": "Go to start / end",
     "sc.marker": "Add marker at playhead",
     "sc.blade": "Blade all tracks",

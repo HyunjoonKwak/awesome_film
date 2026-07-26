@@ -13,7 +13,6 @@ export interface Timeline {
   readonly tracks: readonly Track[];
   readonly playhead: Ms;
   readonly zoom: number;        // pixels per ms
-  readonly magnetic: boolean;   // FCP-style ripple on by default
   readonly duration: Ms;        // computed cap; engine recomputes on edits
   readonly markers?: readonly Marker[]; // optional; backwards compatible
 }

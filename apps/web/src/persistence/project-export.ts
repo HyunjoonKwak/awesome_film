@@ -91,6 +91,7 @@ const trackSchema = z
     muted: z.boolean(),
     solo: z.boolean(),
     locked: z.boolean(),
+    connected: z.boolean().optional(),
     clips: z.array(clipSchema),
   })
   .passthrough();
@@ -130,11 +131,14 @@ const projectSchema = z
         tracks: z.array(trackSchema),
         playhead: nonNegative,
         zoom: positive,
-        magnetic: z.boolean(),
+        // Legacy field — accepted from pre-removal exports (and re-added on
+        // export as a wire-compat shim) but stripped from the runtime model.
+        magnetic: z.boolean().optional(),
         duration: nonNegative,
         markers: z.array(markerSchema).optional(),
       })
-      .passthrough(),
+      .passthrough()
+      .transform(({ magnetic: _legacy, ...rest }) => rest),
     mediaLibrary: z.array(mediaAssetSchema),
   })
   .passthrough() as unknown as z.ZodType<Project>;
@@ -152,7 +156,9 @@ export const toProjectExport = (project: Project): ProjectExport => ({
   schema: "cut_editor-project",
   version: PROJECT_VERSION,
   exportedAt: Date.now(),
-  project,
+  // Wire-compat shim (mirrors the CRDT one): `magnetic` left the model but
+  // older builds' schemas still require the boolean to import the file.
+  project: { ...project, timeline: { ...project.timeline, magnetic: true } } as Project,
 });
 
 export const parseProjectExport = (raw: unknown): ProjectExport => {

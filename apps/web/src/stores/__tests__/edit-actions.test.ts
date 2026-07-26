@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MediaClip, Project } from "@cut/core";
 import { addClip, createEmptyProject, findClip, groupClips, newId } from "@cut/core";
 import { useProjectStore } from "../project-store";
@@ -63,6 +63,57 @@ describe("nudgeClipsBy", () => {
     useProjectStore.getState().undo();
     expect(findClip(timeline(), a.id)!.start).toBe(0);
     expect(findClip(timeline(), b.id)!.start).toBe(1000);
+  });
+});
+
+describe("nudge coalescing (key repeat)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("merges a rapid burst of nudges into one undo entry", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+    // c sits alone on the audio track, free to move right
+    const { c } = setup();
+
+    for (let i = 0; i < 5; i++) useProjectStore.getState().nudgeClipsBy([c.id], 100);
+
+    expect(findClip(timeline(), c.id)!.start).toBe(1500);
+    expect(history().past).toHaveLength(1);
+    useProjectStore.getState().undo();
+    expect(findClip(timeline(), c.id)!.start).toBe(1000);
+  });
+
+  it("does not merge across a pause longer than the coalesce window", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+    const { a } = setup();
+
+    useProjectStore.getState().nudgeClipsBy([a.id], 100);
+    vi.setSystemTime(1_002_000);
+    useProjectStore.getState().nudgeClipsBy([a.id], 100);
+
+    expect(history().past).toHaveLength(2);
+  });
+
+  it("does not merge when the selection changed", () => {
+    const { a, b } = setup();
+
+    useProjectStore.getState().nudgeClipsBy([a.id], 100);
+    useProjectStore.getState().nudgeClipsBy([b.id], 100);
+
+    expect(history().past).toHaveLength(2);
+  });
+
+  it("does not merge across an unrelated edit", () => {
+    const { a } = setup();
+
+    useProjectStore.getState().nudgeClipsBy([a.id], 100);
+    useProjectStore.getState().addMarkerAt(0);
+    useProjectStore.getState().nudgeClipsBy([a.id], 100);
+
+    expect(history().past).toHaveLength(3);
   });
 });
 

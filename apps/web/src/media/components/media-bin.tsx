@@ -17,6 +17,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useMediaUiStore } from "@/stores/media-ui-store";
 import { useProjectStore } from "@/stores/project-store";
 import { useTimelineUiStore } from "@/stores/timeline-ui-store";
 import { useMediaImport } from "@/media/hooks";
@@ -26,7 +27,6 @@ import type { ID } from "@cut/core";
 import { cn } from "@/lib/cn";
 import { useT } from "@/i18n/use-t";
 import type { MediaAsset, MediaKind } from "@cut/core";
-import { newId } from "@cut/core";
 import { deleteMediaFile, getStorageUsage } from "@/persistence/opfs";
 import { generateProxy } from "@/media/proxy";
 
@@ -45,6 +45,7 @@ const fmtSec = (ms: number): string => `${(ms / 1000).toFixed(1)}s`;
 export function MediaBin() {
   const inputRef = useRef<HTMLInputElement>(null);
   const media = useProjectStore((s) => s.project.mediaLibrary);
+  const activeAssetId = useMediaUiStore((s) => s.activeAssetId);
   const removeMediaAsset = useProjectStore((s) => s.removeMediaAsset);
   const setAssetProxy = useProjectStore((s) => s.setAssetProxy);
   const { importing, importFiles } = useMediaImport();
@@ -180,26 +181,7 @@ export function MediaBin() {
   );
 
   const addToTimeline = useCallback((asset: MediaAsset) => {
-    const store = useProjectStore.getState();
-    const targetKind = asset.kind === "audio" ? "audio" : "video";
-    const track = store.project.timeline.tracks.find((tr) => tr.kind === targetKind);
-    if (!track) return;
-    const startMs = track.clips.reduce((max, c) => Math.max(max, c.start + c.duration), 0);
-    // 사용 구간이 지정되어 있으면 그 구간만 추가.
-    const inMs = asset.useInMs ?? 0;
-    const outMs = asset.useOutMs ?? asset.durationMs;
-    store.addClipToTrack(track.id, {
-      kind: "media",
-      id: newId(),
-      assetId: asset.id,
-      start: startMs,
-      duration: Math.max(200, outMs - inMs),
-      trimIn: inMs,
-      trimOut: outMs,
-      speed: 1,
-      effects: [],
-      keyframes: [],
-    });
+    useProjectStore.getState().placeAsset(asset, "append");
   }, []);
 
   const handleDelete = useCallback(
@@ -341,6 +323,7 @@ export function MediaBin() {
           {filtered.map((asset) => {
             const Icon = KIND_ICON[asset.kind];
             const isSelected = selected.has(asset.id);
+            const isActive = activeAssetId === asset.id;
             const isPinned = pinned.includes(asset.id);
             const isExcluded = excluded.includes(asset.id);
             const hasRange = asset.useInMs !== undefined || asset.useOutMs !== undefined;
@@ -348,7 +331,10 @@ export function MediaBin() {
               <li key={asset.id} className="group relative" data-asset-card={asset.id}>
                 <button
                   type="button"
+                  aria-current={isActive ? "true" : undefined}
                   onClick={(e) => {
+                    // Any interaction makes this the E/W/D/Q source asset.
+                    useMediaUiStore.getState().setActiveAssetId(asset.id);
                     if (e.metaKey || e.ctrlKey || e.shiftKey) {
                       toggleSelect(asset.id);
                       return;
@@ -367,13 +353,16 @@ export function MediaBin() {
                     e.dataTransfer.setData("application/x-cut-asset", asset.id);
                     e.dataTransfer.effectAllowed = "copy";
                     useTimelineUiStore.getState().setDragAssetId(asset.id);
+                    useMediaUiStore.getState().setActiveAssetId(asset.id);
                   }}
                   onDragEnd={() => useTimelineUiStore.getState().setDragAssetId(null)}
                   className={cn(
                     "w-full overflow-hidden rounded-md border text-left transition",
                     isSelected
                       ? "border-accent ring-2 ring-accent/60"
-                      : "border-white/5 hover:border-accent",
+                      : isActive
+                        ? "border-accent/50 ring-1 ring-accent/30"
+                        : "border-white/5 hover:border-accent",
                     isExcluded ? "opacity-45" : "bg-panel-2",
                   )}
                   title={t("media.clickToAdd")}

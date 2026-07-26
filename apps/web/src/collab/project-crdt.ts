@@ -55,7 +55,9 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
     setJsonValue(metaMap, "createdAt", project.createdAt);
     setJsonValue(metaMap, "framerate", project.framerate);
     setJsonValue(metaMap, "resolution", project.resolution);
-    setJsonValue(metaMap, "magnetic", project.timeline.magnetic);
+    // Wire-compat shim: `magnetic` left the model (it never drove behavior)
+    // but older peers require a boolean here to accept the snapshot.
+    setJsonValue(metaMap, "magnetic", true);
     setJsonValue(metaMap, "markers", project.timeline.markers ?? []);
 
     const nextMedia = new Map(project.mediaLibrary.map((asset) => [asset.id, asset]));
@@ -113,7 +115,6 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
     const createdAt = metaMap.get("createdAt");
     const framerate = metaMap.get("framerate");
     const resolution = metaMap.get("resolution");
-    const magnetic = metaMap.get("magnetic");
     const markers = metaMap.get("markers");
     if (
       typeof name !== "string" ||
@@ -121,7 +122,6 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
       typeof framerate !== "number" ||
       !resolution ||
       typeof resolution !== "object" ||
-      typeof magnetic !== "boolean" ||
       !Array.isArray(markers)
     ) {
       return null;
@@ -139,7 +139,6 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
         tracks,
         playhead: localView.playhead,
         zoom: localView.zoom,
-        magnetic,
         duration,
         markers: markers as NonNullable<Project["timeline"]["markers"]>,
       },

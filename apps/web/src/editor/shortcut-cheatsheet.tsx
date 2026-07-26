@@ -19,6 +19,7 @@ const SHORTCUTS: readonly { keys: string; labelKey: MessageKey }[] = [
   { keys: "M", labelKey: "sc.marker" },
   { keys: `${ctl} ; / ${ctl} '`, labelKey: "sc.markerNav" },
   { keys: ", .", labelKey: "sc.nudgeClip" },
+  { keys: "E / W / D / Q", labelKey: "sc.threePoint" },
   { keys: "S", labelKey: "sc.split" },
   { keys: `${mod} B`, labelKey: "sc.blade" },
   { keys: "⌫ / Del", labelKey: "sc.rippleDelete" },

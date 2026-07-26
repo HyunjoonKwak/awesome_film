@@ -19,6 +19,21 @@ export const addTrack = (project: Project, track: Omit<Track, "id" | "clips">): 
   });
 };
 
+// Insert a track at a specific array position. Earlier tracks composite on
+// top, so `index` chooses the layer, not just the panel row.
+export const addTrackAt = (
+  project: Project,
+  track: Omit<Track, "id" | "clips">,
+  index: number,
+): Project => {
+  const t: Track = { id: newId(), clips: [], ...track };
+  const at = Math.max(0, Math.min(index, project.timeline.tracks.length));
+  return recompute({
+    ...project,
+    timeline: { ...project.timeline, tracks: project.timeline.tracks.toSpliced(at, 0, t) },
+  });
+};
+
 export const removeTrack = (project: Project, trackId: ID): Project =>
   recompute({
     ...project,

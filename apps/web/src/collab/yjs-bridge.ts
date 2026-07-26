@@ -123,7 +123,6 @@ export const getBridge = (): CollabBridge => {
         project.name === previous.name &&
         project.framerate === previous.framerate &&
         project.resolution === previous.resolution &&
-        project.timeline.magnetic === previous.timeline.magnetic &&
         project.timeline.markers === previous.timeline.markers
       ) {
         return;

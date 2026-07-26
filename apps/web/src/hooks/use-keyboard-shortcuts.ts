@@ -8,9 +8,17 @@ import { useSelectionStore } from "@/stores/selection-store";
 import { useViewStore } from "@/stores/view-store";
 import { useRangeStore } from "@/stores/range-store";
 import { useClipboardStore } from "@/stores/clipboard-store";
+import { useMediaUiStore } from "@/stores/media-ui-store";
 import { useTimelineUiStore } from "@/stores/timeline-ui-store";
 import { ZOOM_STEP, clampZoom } from "@/timeline/constants";
 import { zoomToFit } from "@/timeline/zoom-to-fit";
+
+const THREE_POINT_KEYS: Record<string, "append" | "insert" | "overwrite" | "connect"> = {
+  KeyE: "append",
+  KeyW: "insert",
+  KeyD: "overwrite",
+  KeyQ: "connect",
+};
 
 const isEditable = (target: EventTarget | null): boolean => {
   if (!(target instanceof HTMLElement)) return false;
@@ -151,6 +159,22 @@ export const useKeyboardShortcuts = () => {
       // `n` — toggle edge snapping (FCP).
       if (e.key === "n" && !cmd) {
         useTimelineUiStore.getState().toggleSnap();
+        return;
+      }
+
+      // E/W/D/Q — FCP three-point edit from the media bin's active source:
+      // append to the end / insert with ripple / overwrite / connect above.
+      // e.code, not e.key, so the keys work under a Korean IME layout; no
+      // key-repeat — holding W must not machine-gun full-project snapshots.
+      const threePointMode = THREE_POINT_KEYS[e.code];
+      if (threePointMode && !cmd && !e.altKey && !e.shiftKey) {
+        if (e.repeat) return;
+        const assetId = useMediaUiStore.getState().activeAssetId;
+        if (!assetId) return;
+        const store = useProjectStore.getState();
+        const asset = store.project.mediaLibrary.find((a) => a.id === assetId);
+        if (!asset) return;
+        store.placeAsset(asset, threePointMode);
         return;
       }
 

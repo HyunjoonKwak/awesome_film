@@ -35,7 +35,6 @@ export const createEmptyProject = (overrides?: Partial<Project>): Project => {
       tracks: [videoTrack, audioTrack],
       playhead: 0,
       zoom: 0.05, // 50 px per second by default
-      magnetic: true,
       duration: 0,
     },
     mediaLibrary: [],

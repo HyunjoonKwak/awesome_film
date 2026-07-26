@@ -249,6 +249,7 @@ export const ko = {
     "sc.snap": "스냅 켜기/끄기",
     "sc.copy": "선택 복사 / 잘라내기",
     "sc.paste": "재생 위치에 붙여넣기",
+    "sc.threePoint": "소스 붙이기 / 삽입 / 덮어쓰기 / 연결",
     "sc.homeEnd": "처음 / 끝으로 이동",
     "sc.marker": "재생 위치에 마커 추가",
     "sc.blade": "전체 트랙 자르기",

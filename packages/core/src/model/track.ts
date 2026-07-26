@@ -11,5 +11,9 @@ export interface Track {
   readonly muted: boolean;
   readonly solo: boolean;
   readonly locked: boolean;
+  // FCP-style connected lane (Q): sits above the primary track of its kind
+  // (earlier array index composites on top) and is skipped when three-point
+  // edits pick their target track. Absent = a primary/storyline track.
+  readonly connected?: boolean;
   readonly clips: readonly Clip[];
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  type AppliedCommand,
   type BezierHandles,
   type BlendMode,
   type Clip,
@@ -68,6 +69,7 @@ import { createEffectActions } from "./actions/effect-actions";
 import { createKeyframeActions } from "./actions/keyframe-actions";
 import { createMarkerActions } from "./actions/marker-actions";
 import { createMediaActions } from "./actions/media-actions";
+import { type PlaceMode, createPlaceAssetActions } from "./actions/place-asset-actions";
 import { createTrackActions } from "./actions/track-actions";
 import { runWith } from "./store-helpers";
 import { useTimelineUiStore } from "./timeline-ui-store";
@@ -135,6 +137,7 @@ interface ProjectStoreState {
   toggleTrackLock: (trackId: ID) => void;
   toggleTrackSolo: (trackId: ID) => void;
   addClipToTrack: (trackId: ID, clip: Clip) => void;
+  placeAsset: (asset: MediaAsset, mode: PlaceMode) => void;
   removeClipById: (clipId: ID) => void;
   removeClipsById: (clipIds: readonly ID[]) => void;
   rippleDeleteById: (clipId: ID) => void;
@@ -215,12 +218,53 @@ interface ProjectStoreState {
 // it is transient gesture state, never rendered and never persisted.
 let clipDragBefore: Project | null = null;
 
+// Key-repeat nudge session: consecutive nudges of the same selection within
+// this window merge into the last undo entry, so holding `.` for a second
+// costs one undo step (and one history snapshot pair), not thirty. The
+// session pins the exact history entry it may extend — identity, not label,
+// so an undo (or any other edit) in between can never be merged over.
+let nudgeSession: { key: string; at: number; entry: AppliedCommand } | null = null;
+const NUDGE_COALESCE_MS = 800;
+
+// Pure nudge: move each selected clip/group by `deltaMs`. A group moves
+// once, not once per selected member. Processed in timeline order —
+// trailing clip first when moving right — so adjacent selected clips
+// don't collide with each other and tear apart.
+const applyNudge = (p: Project, clipIds: readonly ID[], deltaMs: Ms): Project => {
+  const seen = new Set<ID>();
+  const targets = p.timeline.tracks
+    .flatMap((t) => t.clips)
+    .filter((c) => clipIds.includes(c.id))
+    .sort((a, b) => (deltaMs > 0 ? b.start - a.start : a.start - b.start))
+    .filter((c) => {
+      const key = c.groupId ?? c.id;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  return targets.reduce((proj, t) => {
+    const clip = findClip(proj.timeline, t.id);
+    if (!clip) return proj;
+    const target = Math.max(0, clip.start + deltaMs);
+    // Grouped clips move rigidly together by the delta.
+    if (clip.groupId) return moveClipOrGroup(proj, t.id, target - clip.start);
+    // Magnetic rule: clips on a track never overlap — clamp into the
+    // nearest free gap.
+    const track = proj.timeline.tracks.find((tr) => tr.clips.some((c) => c.id === t.id));
+    const resolved = track ? resolvePlacement(track.clips, clip.duration, target, t.id) : target;
+    return updateClip(proj, t.id, (c) => ({ ...c, start: resolved }));
+  }, p);
+};
+
 export const useProjectStore = create<ProjectStoreState>()(
   subscribeWithSelector((set, get) => ({
     project: createEmptyProject(),
     history: emptyHistory,
 
-    loadProject: (p) => set({ project: p, history: emptyHistory }),
+    loadProject: (p) => {
+      nudgeSession = null;
+      set({ project: p, history: emptyHistory });
+    },
 
     applyGenerated: (label, build) => runWith(set, label, build),
 
@@ -234,6 +278,7 @@ export const useProjectStore = create<ProjectStoreState>()(
       })),
 
     ...createMediaActions(set),
+    ...createPlaceAssetActions(set),
     ...createTrackActions(set),
     ...createMarkerActions(set),
     ...createKeyframeActions(set),
@@ -292,38 +337,30 @@ export const useProjectStore = create<ProjectStoreState>()(
     // Keyboard nudge (`,`/`.`/arrows): one undoable command for the whole
     // selection, no edge snapping — a one-frame nudge must never
     // re-magnetise to the edge it just left (snap tolerance can exceed a
-    // frame at low zoom).
+    // frame at low zoom). Rapid repeats coalesce into one undo entry.
     nudgeClipsBy: (clipIds, deltaMs) => {
       if (clipIds.length === 0 || deltaMs === 0) return;
-      runWith(set, "Move clip", (p) => {
-        // A group moves once, not once per selected member. Process in
-        // timeline order — trailing clip first when moving right — so
-        // adjacent selected clips don't collide and tear apart.
-        const seen = new Set<ID>();
-        const targets = p.timeline.tracks
-          .flatMap((t) => t.clips)
-          .filter((c) => clipIds.includes(c.id))
-          .sort((a, b) => (deltaMs > 0 ? b.start - a.start : a.start - b.start))
-          .filter((c) => {
-            const key = c.groupId ?? c.id;
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-          });
-        return targets.reduce((proj, t) => {
-          const clip = findClip(proj.timeline, t.id);
-          if (!clip) return proj;
-          const target = Math.max(0, clip.start + deltaMs);
-          // Grouped clips move rigidly together by the delta.
-          if (clip.groupId) return moveClipOrGroup(proj, t.id, target - clip.start);
-          // Magnetic rule: clips on a track never overlap — clamp into the
-          // nearest free gap.
-          const track = proj.timeline.tracks.find((tr) => tr.clips.some((c) => c.id === t.id));
-          const resolved = track
-            ? resolvePlacement(track.clips, clip.duration, target, t.id)
-            : target;
-          return updateClip(proj, t.id, (c) => ({ ...c, start: resolved }));
-        }, p);
+      set((s) => {
+        const after = applyNudge(s.project, clipIds, deltaMs);
+        if (after === s.project) return {};
+        const key = [...clipIds].sort().join("|");
+        const now = Date.now();
+        const last = s.history.past[s.history.past.length - 1];
+        // Merge only when this is provably a continuation: same selection,
+        // inside the window, the last entry is the exact one this session
+        // recorded, and no other edit landed in between.
+        const continues =
+          nudgeSession !== null &&
+          nudgeSession.key === key &&
+          now - nudgeSession.at < NUDGE_COALESCE_MS &&
+          last !== undefined &&
+          last === nudgeSession.entry &&
+          last.after === s.project;
+        const history: CommandHistory = continues
+          ? { past: [...s.history.past.slice(0, -1), { ...last, after, at: now }], future: [] }
+          : recordApplied(s.project, after, s.history, "Nudge clip");
+        nudgeSession = { key, at: now, entry: history.past[history.past.length - 1]! };
+        return { project: after, history };
       });
     },
 

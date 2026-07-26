@@ -1,5 +1,6 @@
 export * from "./query";
 export * from "./edit-points";
+export * from "./three-point";
 export * from "./mutate";
 export * from "./split";
 export * from "./snap";
