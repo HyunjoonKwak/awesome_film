@@ -71,9 +71,10 @@ const findHomeTrack = (project: Project, originalId: ID) => {
   for (const t of project.timeline.tracks) {
     if (t.clips.some((c) => c.id === originalId)) return t;
   }
-  // After all splits, the original id is gone. Fall back to the first track
-  // whose clip ids point to the same asset as the original clip.
-  return project.timeline.tracks[0];
+  // After all splits, the original id is gone. Fall back to the primary
+  // video track — never tracks[0] blindly, which is where subtitle/title
+  // lanes now live (silence removal must not split caption clips).
+  return project.timeline.tracks.find((t) => t.kind === "video" && !t.connected);
 };
 
 // Map a silence range expressed in the source asset's time domain to the

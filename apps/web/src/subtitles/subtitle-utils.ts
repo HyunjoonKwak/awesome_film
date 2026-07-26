@@ -1,22 +1,27 @@
-import { addClip, addTrack, newId, type Project, type Track } from "@cut/core";
+import { addClip, addTrackAt, newId, type Project, type Track } from "@cut/core";
 import type { SubtitleCue } from "./srt";
 
 const SUBS_TRACK_NAME = "Subtitles";
 
-// Find the existing subtitle track or create one at the top.
+// Find the existing subtitle track or create one at the top — index 0
+// composites above everything, so captions are never hidden behind video.
 const ensureSubtitleTrack = (project: Project): { project: Project; track: Track } => {
   let track = project.timeline.tracks.find((t) => t.name === SUBS_TRACK_NAME);
   let next = project;
   if (!track) {
-    next = addTrack(project, {
-      kind: "text",
-      name: SUBS_TRACK_NAME,
-      height: 36,
-      muted: false,
-      solo: false,
-      locked: false,
-    });
-    track = next.timeline.tracks.at(-1)!;
+    next = addTrackAt(
+      project,
+      {
+        kind: "text",
+        name: SUBS_TRACK_NAME,
+        height: 36,
+        muted: false,
+        solo: false,
+        locked: false,
+      },
+      0,
+    );
+    track = next.timeline.tracks[0]!;
   }
   return { project: next, track };
 };

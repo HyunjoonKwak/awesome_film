@@ -1,15 +1,46 @@
 import {
   addClip,
-  addTrack,
+  addTrackAt,
   newId,
   updateClip,
   type ID,
+  type Project,
   type ShapeClip,
   type ShapeKind,
   type TextAlign,
   type TextAnimation,
+  type Track,
 } from "@cut/core";
 import { runWith, type ProjectMutating, type SetFn } from "../store-helpers";
+
+// Reserved lanes are owned by generators (SRT import wipes "Subtitles"
+// wholesale, auto-edit rerun deletes every "AUTO " track) — manual clips
+// must never land on them or they'd be silently destroyed later.
+const isReservedTrack = (t: Track): boolean =>
+  t.name === "Subtitles" || t.name.startsWith("AUTO ");
+
+// Overlay-family clips (text, titles, shapes, adjustment layers) must sit
+// ABOVE the primary video track — earlier array index composites on top —
+// or they'd be hidden behind its media clips. Reuse the topmost suitable
+// track above the primary, else insert a fresh one at the very top.
+const resolveUpperTrack = (
+  p: Project,
+  kind: "text" | "overlay",
+  name: string,
+): { proj: Project; track: Track } => {
+  const primaryIdx = p.timeline.tracks.findIndex((t) => t.kind === "video" && !t.connected);
+  const limit = primaryIdx < 0 ? p.timeline.tracks.length : primaryIdx;
+  const existing = p.timeline.tracks
+    .slice(0, limit)
+    .find((t) => t.kind === kind && !t.locked && !isReservedTrack(t));
+  if (existing) return { proj: p, track: existing };
+  const proj = addTrackAt(
+    p,
+    { kind, name, height: kind === "text" ? 48 : 60, muted: false, solo: false, locked: false },
+    0,
+  );
+  return { proj, track: proj.timeline.tracks[0]! };
+};
 
 // Which built-in title layout to drop at the playhead.
 export type TitleTemplate = "title" | "subtitle" | "lowerThird";
@@ -65,20 +96,11 @@ export const createClipCreateActions = <S extends ProjectMutating>(
 ): ClipCreateActions => ({
   addTextClipAtPlayhead: (text = "Title") =>
     runWith(set, "Add text", (p) => {
-      // Pick (or create) the first text/overlay track.
-      let textTrack = p.timeline.tracks.find((t) => t.kind === "text");
-      let projectAfter = p;
-      if (!textTrack) {
-        projectAfter = addTrack(p, {
-          kind: "text",
-          name: `T${p.timeline.tracks.filter((t) => t.kind === "text").length + 1}`,
-          height: 48,
-          muted: false,
-          solo: false,
-          locked: false,
-        });
-        textTrack = projectAfter.timeline.tracks.at(-1)!;
-      }
+      const { proj: projectAfter, track: textTrack } = resolveUpperTrack(
+        p,
+        "text",
+        `T${p.timeline.tracks.filter((t) => t.kind === "text").length + 1}`,
+      );
       return addClip(projectAfter, textTrack.id, {
         kind: "text",
         id: newId(),
@@ -97,13 +119,7 @@ export const createClipCreateActions = <S extends ProjectMutating>(
   addTitleTemplate: (kind) =>
     runWith(set, "Add title template", (p) => {
       const at = p.timeline.playhead;
-      // Resolve (or create) an overlay/video track to hold the template.
-      let track = [...p.timeline.tracks].reverse().find((t) => t.kind === "overlay" || t.kind === "video");
-      let proj = p;
-      if (!track) {
-        proj = addTrack(p, { kind: "overlay", name: "FX", height: 60, muted: false, solo: false, locked: false });
-        track = proj.timeline.tracks.at(-1)!;
-      }
+      const { proj, track } = resolveUpperTrack(p, "overlay", "FX");
       const baseText = {
         kind: "text" as const,
         start: at,
@@ -140,7 +156,18 @@ export const createClipCreateActions = <S extends ProjectMutating>(
         });
       }
       // lower-third: a semi-transparent backing bar plus left-aligned text.
-      const withBar = addClip(proj, track.id, {
+      // Same-start clips draw earliest-added on top (compositor reverses the
+      // track-order list), so the text goes in FIRST, the bar behind it.
+      const withText = addClip(proj, track.id, {
+        ...baseText,
+        id: newId(),
+        text: "Name\nRole / Title",
+        size: 40,
+        align: "left",
+        animIn: "slide-up",
+        transform: { x: -0.22, y: -0.58, scale: 1, rotation: 0, opacity: 1 },
+      });
+      return addClip(withText, track.id, {
         kind: "shape",
         id: newId(),
         start: at,
@@ -154,15 +181,6 @@ export const createClipCreateActions = <S extends ProjectMutating>(
         strokeWidth: 0,
         cornerRadius: 12,
         transform: { x: -0.12, y: -0.58, scale: 0.6, rotation: 0, opacity: 1 },
-      });
-      return addClip(withBar, track.id, {
-        ...baseText,
-        id: newId(),
-        text: "Name\nRole / Title",
-        size: 40,
-        align: "left",
-        animIn: "slide-up",
-        transform: { x: -0.22, y: -0.58, scale: 1, rotation: 0, opacity: 1 },
       });
     }),
 
@@ -193,19 +211,7 @@ export const createClipCreateActions = <S extends ProjectMutating>(
 
   addShapeClipAtPlayhead: (shape) =>
     runWith(set, "Add shape", (p) => {
-      let track = p.timeline.tracks.find((t) => t.kind === "overlay" || t.kind === "video");
-      let projectAfter = p;
-      if (!track) {
-        projectAfter = addTrack(p, {
-          kind: "video",
-          name: "V1",
-          height: 60,
-          muted: false,
-          solo: false,
-          locked: false,
-        });
-        track = projectAfter.timeline.tracks.at(-1)!;
-      }
+      const { proj: projectAfter, track } = resolveUpperTrack(p, "overlay", "FX");
       return addClip(projectAfter, track.id, {
         kind: "shape",
         id: newId(),
@@ -224,21 +230,9 @@ export const createClipCreateActions = <S extends ProjectMutating>(
 
   addAdjustmentClipAtPlayhead: () =>
     runWith(set, "Add adjustment layer", (p) => {
-      // Adjustment layers belong above the content they grade, so prefer a
-      // top overlay track; create one if the project has none.
-      let track = [...p.timeline.tracks].reverse().find((t) => t.kind === "overlay" || t.kind === "video");
-      let projectAfter = p;
-      if (!track) {
-        projectAfter = addTrack(p, {
-          kind: "overlay",
-          name: "FX",
-          height: 60,
-          muted: false,
-          solo: false,
-          locked: false,
-        });
-        track = projectAfter.timeline.tracks.at(-1)!;
-      }
+      // Adjustment layers grade everything drawn beneath them, so they must
+      // sit above the primary video track to have any effect.
+      const { proj: projectAfter, track } = resolveUpperTrack(p, "overlay", "FX");
       return addClip(projectAfter, track.id, {
         kind: "adjustment",
         id: newId(),

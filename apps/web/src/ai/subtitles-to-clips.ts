@@ -1,6 +1,6 @@
 import {
   addClip,
-  addTrack,
+  addTrackAt,
   newId,
   type Project,
   type Track,
@@ -18,19 +18,24 @@ export const subtitlesToClips = (
 ): Project => {
   if (subtitles.length === 0) return project;
 
-  // Ensure a dedicated subtitle track exists at the top.
+  // Ensure a dedicated subtitle track exists at the top — index 0
+  // composites above everything, so captions are never hidden.
   let next = project;
   let track: Track | undefined = next.timeline.tracks.find((t) => t.name === "Subtitles");
   if (!track) {
-    next = addTrack(next, {
-      kind: "text",
-      name: "Subtitles",
-      height: 36,
-      muted: false,
-      solo: false,
-      locked: false,
-    });
-    track = next.timeline.tracks.at(-1)!;
+    next = addTrackAt(
+      next,
+      {
+        kind: "text",
+        name: "Subtitles",
+        height: 36,
+        muted: false,
+        solo: false,
+        locked: false,
+      },
+      0,
+    );
+    track = next.timeline.tracks[0]!;
   }
 
   const srcStart = sourceClip.trimIn;

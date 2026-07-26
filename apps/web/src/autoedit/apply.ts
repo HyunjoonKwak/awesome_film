@@ -2,6 +2,7 @@ import {
   addClip,
   addMarker,
   addTrack,
+  addTrackAt,
   newId,
   type Clip,
   type ID,
@@ -158,14 +159,15 @@ export const applyPlanToProject = (project: Project, opts: ApplyOptions): Projec
   const vertical = preset.aspect === "9:16";
   if (vertical) p = { ...p, resolution: { w: 1080, h: 1920 } };
 
-  // Fresh AUTO tracks (top video + optional title overlay + music).
-  p = addTrack(p, { kind: "video", name: "AUTO V", height: 60, muted: false, solo: false, locked: false });
-  const videoTrack = p.timeline.tracks.at(-1)!;
+  // Fresh AUTO tracks at the top of the stack (earlier index composites on
+  // top): titles above the auto video, so chapter cards are never hidden.
+  p = addTrackAt(p, { kind: "video", name: "AUTO V", height: 60, muted: false, solo: false, locked: false }, 0);
+  const videoTrack = p.timeline.tracks[0]!;
   const wantsTitles = plan.items.some((i) => i.chapter) || Boolean(opts.summary);
   let titleTrackId: ID | null = null;
   if (wantsTitles) {
-    p = addTrack(p, { kind: "text", name: "AUTO T", height: 44, muted: false, solo: false, locked: false });
-    titleTrackId = p.timeline.tracks.at(-1)!.id;
+    p = addTrackAt(p, { kind: "text", name: "AUTO T", height: 44, muted: false, solo: false, locked: false }, 0);
+    titleTrackId = p.timeline.tracks[0]!.id;
   }
 
   let cursor = 0;
