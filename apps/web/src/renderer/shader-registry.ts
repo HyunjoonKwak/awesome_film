@@ -22,7 +22,7 @@ import { fs as whiteBalanceFs } from "./shaders/white-balance";
 import { fs as levelsFs } from "./shaders/levels";
 import { fs as vibranceFs } from "./shaders/vibrance";
 import { fs as splitToneFs } from "./shaders/split-tone";
-import { fs as blendOverlayFs } from "./shaders/blend-overlay";
+import { fs as blendModesFs } from "./shaders/blend-modes";
 import { fs as fitFs } from "./shaders/fit";
 
 // Built-in fragment shaders. Each name maps to the GLSL source from a single
@@ -48,7 +48,7 @@ const SHADERS: Readonly<Record<string, string>> = {
   levels: levelsFs,
   vibrance: vibranceFs,
   "split-tone": splitToneFs,
-  "blend-overlay": blendOverlayFs,
+  "blend-modes": blendModesFs,
   fit: fitFs,
 };
 

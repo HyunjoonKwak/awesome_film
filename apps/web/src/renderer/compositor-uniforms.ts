@@ -4,6 +4,7 @@
 
 import {
   sampleKeyframes,
+  type BackdropBlendMode,
   type Clip,
   type EffectInstance,
   type Project,
@@ -21,6 +22,28 @@ const WIPE_MODE: Partial<Record<TransitionType, number>> = {
   "wipe-up": 3,
   "wipe-down": 4,
   "wipe-circle": 5,
+};
+
+// Backdrop blend mode → integer u_mode value the blend-modes shader switches
+// on. Deliberately a total Record and not a Partial one: adding a mode to
+// BLEND_MODES without a value here is a type error, whereas a Partial map
+// would need a `?? 0` fallback and would quietly render the new mode as
+// overlay. The GLSL side has no compiler to enforce the other half of this
+// contract, so blend-modes.test.ts checks the cases exist in the source.
+export const BACKDROP_BLEND_MODE: Record<BackdropBlendMode, number> = {
+  overlay: 0,
+  "soft-light": 1,
+  darken: 2,
+  lighten: 3,
+  "hard-light": 4,
+  "color-dodge": 5,
+  "color-burn": 6,
+  difference: 7,
+  exclusion: 8,
+  hue: 9,
+  saturation: 10,
+  color: 11,
+  luminosity: 12,
 };
 
 export interface ClipTf {

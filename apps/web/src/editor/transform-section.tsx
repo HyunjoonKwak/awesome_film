@@ -7,13 +7,12 @@ import { useProjectStore, selectPlayhead } from "@/stores/project-store";
 import { InspectorSection } from "@/components/inspector-section";
 import { NumberScrubber } from "@/components/number-scrubber";
 import { useT } from "@/i18n/use-t";
+import { BLEND_GROUPS } from "./blend-groups";
 
 interface Props {
   clipId: ID;
   clip: Clip;
 }
-
-const BLEND_MODES: readonly BlendMode[] = ["normal", "multiply", "screen", "add", "overlay", "soft-light"];
 
 // Picture-in-picture corner placements (scaled-down inset) plus a centered
 // full-size reset. x/y are centered fractions; +y is up in the compositor.
@@ -114,10 +113,14 @@ export function TransformSection({ clipId, clip }: Props) {
           onChange={(e) => setBlendMode(clipId, e.target.value as BlendMode)}
           className="flex-1 rounded bg-white/5 px-2 py-1 text-xs text-ink-1 outline-none"
         >
-          {BLEND_MODES.map((m) => (
-            <option key={m} value={m} className="bg-panel-2">
-              {t(`blend.${m}`)}
-            </option>
+          {BLEND_GROUPS.map((g) => (
+            <optgroup key={g.labelKey} label={t(g.labelKey)} className="bg-panel-2">
+              {g.modes.map((m) => (
+                <option key={m} value={m} className="bg-panel-2">
+                  {t(`blend.${m}`)}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
       </div>

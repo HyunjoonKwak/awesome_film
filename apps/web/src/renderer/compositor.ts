@@ -7,6 +7,7 @@ import {
   isAdjustmentClip,
   isBackdropBlend,
   isWipe,
+  type BackdropBlendMode,
   type Clip,
   type AdjustmentClip,
   type EffectInstance,
@@ -35,6 +36,7 @@ import { BoundedResourceCache } from "./bounded-resource-cache";
 import { useLutStore } from "@/effects/lut/lut-store";
 import {
   animateEffects,
+  BACKDROP_BLEND_MODE,
   setBlendMode,
   setMaskUniforms,
   setTransformUniforms,
@@ -197,12 +199,7 @@ export class Compositor {
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
       if (isBackdropBlend(clip.blendMode)) {
-        this.compositeBackdropBlend(
-          finalTex,
-          composed,
-          clip.mask,
-          clip.blendMode as "overlay" | "soft-light",
-        );
+        this.compositeBackdropBlend(finalTex, composed, clip.mask, clip.blendMode, wipe);
       } else {
         setBlendMode(gl, clip.blendMode);
         const prog = this.shaders.get("blit");
@@ -220,13 +217,15 @@ export class Compositor {
     setBlendMode(gl, "normal");
   }
 
-  // Composites a clip with overlay/soft-light by capturing the backdrop and
-  // blending it in a shader (fixed-function GL blending can't express these).
+  // Composites a clip with one of the backdrop-reading blend modes by
+  // capturing the backdrop and blending it in a shader (fixed-function GL
+  // blending can't express these).
   private compositeBackdropBlend(
     finalTex: WebGLTexture,
     tf: { x: number; y: number; scale: number; rotation: number; opacity: number },
     mask: Clip["mask"],
-    mode: "overlay" | "soft-light",
+    mode: BackdropBlendMode,
+    wipe: TransitionFrame | null,
   ) {
     const gl = this.gl;
     const w = gl.drawingBufferWidth;
@@ -238,7 +237,7 @@ export class Compositor {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, w, h);
     setBlendMode(gl, "normal");
-    const prog = this.shaders.get("blend-overlay");
+    const prog = this.shaders.get("blend-modes");
     prog.use();
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, finalTex);
@@ -249,8 +248,9 @@ export class Compositor {
     const resLoc = prog.uniform("u_resolution");
     if (resLoc) gl.uniform2f(resLoc, w, h);
     const modeLoc = prog.uniform("u_mode");
-    if (modeLoc) gl.uniform1i(modeLoc, mode === "soft-light" ? 1 : 0);
+    if (modeLoc) gl.uniform1i(modeLoc, BACKDROP_BLEND_MODE[mode]);
     setTransformUniforms(gl, prog, tf);
+    setWipeUniforms(gl, prog, wipe);
     setMaskUniforms(gl, prog, mask);
     this.quad.draw();
   }

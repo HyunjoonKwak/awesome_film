@@ -37,14 +37,59 @@ export interface ClipMask {
   readonly inverted: boolean;
 }
 
-// Compositing blend mode against the accumulated frame below. normal/multiply/
-// screen/add use fixed-function GL blending; overlay/soft-light sample the
-// captured backdrop in a shader.
-export type BlendMode = "normal" | "multiply" | "screen" | "add" | "overlay" | "soft-light";
+// Compositing blend modes against the accumulated frame below, in UI order.
+// This array is the single source of truth: the BlendMode type is derived from
+// it, and the inspector renders straight from it. Adding a mode here is enough
+// for the type, the picker and isBackdropBlend to agree — only the shader's
+// u_mode switch and the i18n label need a matching entry.
+export const BLEND_MODES = [
+  "normal",
+  "multiply",
+  "screen",
+  "add",
+  "darken",
+  "lighten",
+  "overlay",
+  "soft-light",
+  "hard-light",
+  "color-dodge",
+  "color-burn",
+  "difference",
+  "exclusion",
+  "hue",
+  "saturation",
+  "color",
+  "luminosity",
+] as const;
+
+export type BlendMode = (typeof BLEND_MODES)[number];
+
+// The only modes expressible with fixed-function GL blend factors. Everything
+// else has to read the backdrop in a shader, so this set is the whitelist and
+// isBackdropBlend is its inverse — a newly added mode defaults to the shader
+// path rather than silently falling through to blit and looking like "normal".
+const FIXED_FUNCTION_BLEND: ReadonlySet<string> = new Set([
+  "normal",
+  "multiply",
+  "screen",
+  "add",
+]);
+
+// Modes that require sampling the captured backdrop (shader path).
+export type BackdropBlendMode = Exclude<
+  BlendMode,
+  "normal" | "multiply" | "screen" | "add"
+>;
+
+const KNOWN_BLEND: ReadonlySet<string> = new Set(BLEND_MODES);
 
 // Blend modes that require reading the backdrop (shader path, not GL blend func).
-export const isBackdropBlend = (m: BlendMode | undefined): boolean =>
-  m === "overlay" || m === "soft-light";
+// Unknown strings answer false on purpose: project files are validated with a
+// passthrough schema, so a mode written by a newer build can reach us here. The
+// blit path renders those as "normal" instead of indexing the shader's mode map
+// out of range.
+export const isBackdropBlend = (m: BlendMode | undefined): m is BackdropBlendMode =>
+  !!m && KNOWN_BLEND.has(m) && !FIXED_FUNCTION_BLEND.has(m);
 
 export interface ClipBase {
   readonly id: ID;
