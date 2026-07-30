@@ -12,6 +12,7 @@ export function Playhead({ containerWidth }: { containerWidth: number }) {
 
   return (
     <div
+      data-testid="tl-playhead"
       className="pointer-events-none absolute top-0 z-20 h-full w-px bg-accent"
       style={{ left: x }}
       aria-hidden

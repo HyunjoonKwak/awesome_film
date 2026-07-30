@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
+import { clipIdsInMarquee, type ID } from "@cut/core";
 import { useProjectStore, selectZoom } from "@/stores/project-store";
 import { useSelectionStore } from "@/stores/selection-store";
 import { useRangeStore } from "@/stores/range-store";
@@ -89,9 +90,33 @@ export function TimelinePanel() {
     null,
   );
 
+  // Press bookkeeping shared by the scrub and marquee gestures. `moved` tells a
+  // click apart from a drag: the background doubles as the scrub surface, so
+  // "clear the selection on release" has to fire for a click and stay out of
+  // the way of a scrub.
+  const pressRef = useRef<{
+    x: number;
+    y: number;
+    moved: boolean;
+    onTrack: boolean;
+    cancelled: boolean;
+  } | null>(null);
+
+  // Below this the press is a click, not a drag — matches the media bin.
+  const DRAG_SLOP = 4;
+
   const innerPoint = (e: React.PointerEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
+
+  const endPress = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    const press = pressRef.current;
+    pressRef.current = null;
+    return press;
   };
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -99,7 +124,20 @@ export function TimelinePanel() {
     // Only act when the press landed on the ruler / background, not a clip.
     const target = e.target as HTMLElement;
     if (target.closest("[data-clip]")) return;
+    // Track-header controls (mute, solo, lock…) sit inside the background and
+    // must not scrub or deselect on their way to their own onClick.
+    if (target.closest("button, input, select, textarea")) return;
     e.currentTarget.setPointerCapture(e.pointerId);
+    pressRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      moved: false,
+      // Only presses inside a track row clear the selection. Clicking the
+      // ruler is how you reposition the playhead; losing the selection to it
+      // would punish an ordinary seek.
+      onTrack: !!target.closest("[data-track]"),
+      cancelled: false,
+    };
     if (e.metaKey || e.ctrlKey) {
       const p = innerPoint(e);
       setMarquee({ x0: p.x, y0: p.y, x1: p.x, y1: p.y });
@@ -110,6 +148,12 @@ export function TimelinePanel() {
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if ((e.buttons & 1) === 0) return;
+    const press = pressRef.current;
+    if (press?.cancelled) return;
+    if (press && !press.moved) {
+      press.moved =
+        Math.abs(e.clientX - press.x) > DRAG_SLOP || Math.abs(e.clientY - press.y) > DRAG_SLOP;
+    }
     if (marquee) {
       const p = innerPoint(e);
       setMarquee({ ...marquee, x1: p.x, y1: p.y });
@@ -119,36 +163,64 @@ export function TimelinePanel() {
   };
 
   const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!marquee) return;
     const inner = e.currentTarget;
-    const innerRect = inner.getBoundingClientRect();
-    const [left, right] = [Math.min(marquee.x0, marquee.x1), Math.max(marquee.x0, marquee.x1)];
-    const [top, bottom] = [Math.min(marquee.y0, marquee.y1), Math.max(marquee.y0, marquee.y1)];
-    const msFrom = (left - TRACK_HEADER_W) / zoom;
-    const msTo = (right - TRACK_HEADER_W) / zoom;
+    const press = endPress(e);
+    const band = marquee;
+    setMarquee(null);
+    if (press?.cancelled) return;
 
-    // Tracks whose row intersects the marquee vertically.
-    const hitTrackIds = new Set<string>();
+    // A press that never moved is a click: on empty track space that means
+    // "deselect". Esc does the same thing globally.
+    if (!press?.moved) {
+      if (press?.onTrack) useSelectionStore.getState().clear();
+      return;
+    }
+    if (!band) return;
+
+    const innerRect = inner.getBoundingClientRect();
+    const [left, right] = [Math.min(band.x0, band.x1), Math.max(band.x0, band.x1)];
+    const [top, bottom] = [Math.min(band.y0, band.y1), Math.max(band.y0, band.y1)];
+
+    // Tracks whose row intersects the marquee vertically. The id round-trips
+    // through the DOM as a plain string, so it needs re-branding here.
+    const hitTrackIds = new Set<ID>();
     for (const row of inner.querySelectorAll<HTMLElement>("[data-track]")) {
       const r = row.getBoundingClientRect();
       const rowTop = r.top - innerRect.top;
       const rowBottom = rowTop + r.height;
       if (rowBottom >= top && rowTop <= bottom && row.dataset.track) {
-        hitTrackIds.add(row.dataset.track);
+        hitTrackIds.add(row.dataset.track as ID);
       }
     }
 
-    const ids = useProjectStore
-      .getState()
-      .project.timeline.tracks.filter((tr) => hitTrackIds.has(tr.id))
-      .flatMap((tr) =>
-        tr.clips
-          .filter((c) => c.start < msTo && c.start + c.duration > msFrom)
-          .map((c) => c.id),
-      );
+    const tracksNow = useProjectStore.getState().project.timeline.tracks;
+    const ids = clipIdsInMarquee(
+      tracksNow,
+      hitTrackIds,
+      (left - TRACK_HEADER_W) / zoom,
+      (right - TRACK_HEADER_W) / zoom,
+    );
     useSelectionStore.getState().selectMany(ids);
+  };
+
+  const onPointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+    endPress(e);
     setMarquee(null);
   };
+
+  // Esc abandons an in-flight band. The press stays flagged as cancelled so the
+  // rest of the drag neither scrubs nor re-opens the marquee on release.
+  const marqueeActive = marquee !== null;
+  useEffect(() => {
+    if (!marqueeActive) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (pressRef.current) pressRef.current.cancelled = true;
+      setMarquee(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [marqueeActive]);
 
   return (
     <div className="flex h-full flex-col bg-panel-1">
@@ -264,6 +336,8 @@ export function TimelinePanel() {
           style={{ minWidth }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerCancel}
         >
           <TimelineRuler width={minWidth} />
           <MarkerStrip />
@@ -277,6 +351,18 @@ export function TimelinePanel() {
           <SnapGuide />
           <SkimLine />
           <PeerCursors />
+          {marquee && (
+            <div
+              data-testid="tl-marquee"
+              className="pointer-events-none absolute z-20 rounded-sm border border-accent/70 bg-accent/15"
+              style={{
+                left: Math.min(marquee.x0, marquee.x1),
+                top: Math.min(marquee.y0, marquee.y1),
+                width: Math.abs(marquee.x1 - marquee.x0),
+                height: Math.abs(marquee.y1 - marquee.y0),
+              }}
+            />
+          )}
         </div>
       </div>
     </div>
