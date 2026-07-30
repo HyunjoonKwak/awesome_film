@@ -1,6 +1,6 @@
 {
   "name": "@cut/desktop",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Electron shell that packages the Reelog web app as a native macOS application.",
   "author": "Reelog contributors",
