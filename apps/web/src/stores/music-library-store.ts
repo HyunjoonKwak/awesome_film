@@ -44,6 +44,8 @@ const sanitizeRef = (raw: unknown): MusicRef | null => {
   const youtubeTitle = optStr(r.youtubeTitle);
   const note = optStr(r.note);
   const assetId = optStr(r.assetId);
+  const fileHash = optStr(r.fileHash);
+  const fileName = optStr(r.fileName);
   return {
     id: (optStr(r.id) ?? newId()) as ID,
     title: r.title,
@@ -57,6 +59,8 @@ const sanitizeRef = (raw: unknown): MusicRef | null => {
     ...(youtubeTitle ? { youtubeTitle } : {}),
     ...(note ? { note } : {}),
     ...(assetId ? { assetId: assetId as ID } : {}),
+    ...(fileHash ? { fileHash } : {}),
+    ...(fileName ? { fileName } : {}),
   };
 };
 

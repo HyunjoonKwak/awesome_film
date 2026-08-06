@@ -5,6 +5,7 @@ import { Music2, Plus, X } from "lucide-react";
 import { useT } from "@/i18n/use-t";
 import { useMusicLibraryStore } from "@/stores/music-library-store";
 import { MusicAddForm } from "./music-add-form";
+import { MusicFreeSearch } from "./music-free-search";
 import { MusicRecommend } from "./music-recommend";
 import { MusicRefCard } from "./music-ref-card";
 
@@ -31,6 +32,7 @@ export function MusicPanel() {
       </div>
       {adding && <MusicAddForm onDone={() => setAdding(false)} />}
       <MusicRecommend />
+      <MusicFreeSearch />
       <div className="flex flex-col gap-2 p-3">
         {refs.length === 0 && !adding && <p className="text-xs text-ink-3">{t("music.empty")}</p>}
         {refs.map((r) => (

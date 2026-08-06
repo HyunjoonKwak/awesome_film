@@ -344,6 +344,31 @@ ipcMain.handle("cut:save-export", async (event, payload) => {
   return result.filePath;
 });
 
+// IPC: YouTube music-credit lookup for the music library. Main has no CORS,
+// so it can read the watch page the renderer cannot. Read-only metadata —
+// the renderer parses the returned text with its own credits parser.
+const { creditsTextFromWatchHtml, isAllowedYoutubeUrl } = require("./music-credits.cjs");
+
+ipcMain.handle("cut:fetch-music-credits", async (_event, url) => {
+  if (!isAllowedYoutubeUrl(url)) return null;
+  try {
+    const res = await fetch(String(url), {
+      signal: AbortSignal.timeout(8000),
+      // English UI labels keep the structured rows parseable regardless of
+      // the machine's locale (the parser understands ko labels too).
+      headers: { "accept-language": "en" },
+    });
+    // Redirects are followed — re-verify the FINAL origin stayed on the
+    // allowlist before reading the body, and cap it (watch pages ~1-2MB).
+    if (!res.ok || !isAllowedYoutubeUrl(res.url)) return null;
+    const html = await res.text();
+    if (html.length > 5_000_000) return null;
+    return creditsTextFromWatchHtml(html);
+  } catch {
+    return null;
+  }
+});
+
 app.whenReady().then(() => {
   // CUT_UPDATE_SMOKE=1 drives the update check once and exits (no window).
   if (process.env.CUT_UPDATE_SMOKE === "1") {

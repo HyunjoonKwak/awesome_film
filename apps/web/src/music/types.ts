@@ -17,5 +17,9 @@ export interface MusicRef {
   readonly scenes: readonly string[]; // 오프닝, 여행, 하이라이트 …
   readonly note?: string; // which scene / what feel it was used for
   readonly assetId?: ID; // linked audio asset in the media bin (ready to use)
+  // Content-addressed copy in the app-global music store (OPFS) — lets any
+  // project restore the audio without re-importing by hand.
+  readonly fileHash?: string; // SHA-256 hex of the audio bytes
+  readonly fileName?: string;
   readonly addedAt: number;
 }

@@ -26,4 +26,7 @@ contextBridge.exposeInMainWorld("cutDesktop", {
   // Native save dialog → returns the chosen file path, or null on cancel.
   // Accepts a Uint8Array of encoded bytes; the main process writes the file.
   saveExport: async (payload) => ipcRenderer.invoke("cut:save-export", payload),
+  // YouTube music-credit text for the music library (desktop only — main
+  // process fetch has no CORS). Returns parseable text or null.
+  fetchMusicCredits: async (url) => ipcRenderer.invoke("cut:fetch-music-credits", url),
 });

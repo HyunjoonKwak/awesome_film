@@ -1,4 +1,6 @@
 import type { Project } from "@cut/core";
+import { musicStoreKeepKeys } from "@/music/file-store";
+import { useMusicLibraryStore } from "@/stores/music-library-store";
 import { deleteMediaFile, listMediaKeys } from "./opfs";
 import { listProjectsLibrary, loadStoredProject } from "./project-library";
 
@@ -60,6 +62,9 @@ const salvageMediaKeys = (raw: string, keep: Set<string>): void => {
 export const collectMediaGarbage = async (current: Project): Promise<number> => {
   const keep = new Set<string>();
   collectKeys(current, keep);
+  // Music files in the app-global store stay alive while a library ref
+  // points at them — deleting the ref lets the next GC pass reap the file.
+  for (const key of musicStoreKeepKeys(useMusicLibraryStore.getState().refs)) keep.add(key);
   for (const row of await listProjectsLibrary()) {
     const result = await loadStoredProject(row.id);
     // A damaged row can't be parsed, but salvage any OPFS-key-shaped strings

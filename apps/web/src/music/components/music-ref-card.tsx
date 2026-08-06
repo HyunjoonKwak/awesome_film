@@ -1,13 +1,25 @@
 "use client";
 
-import { ExternalLink, Music2, Trash2, Unlink, Youtube } from "lucide-react";
+import { useState } from "react";
+import { ExternalLink, Loader2, Music2, Trash2, Unlink, Youtube } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
 import type { MessageKey } from "@/i18n/messages";
 import { useT } from "@/i18n/use-t";
+import { importMediaFile } from "@/media/import";
+import { leaseMediaKey } from "@/persistence/media-gc";
+import { readMediaFile } from "@/persistence/opfs";
 import { useMusicLibraryStore } from "@/stores/music-library-store";
 import { useProjectStore } from "@/stores/project-store";
 import type { ID } from "@cut/core";
+import {
+  audioMimeFor,
+  hashBlob,
+  musicStoreKey,
+  readMusicFile,
+  safeFileName,
+  saveMusicFile,
+} from "../file-store";
 import type { MusicRecommendation } from "../recommend";
 import type { MusicLicense, MusicRef } from "../types";
 
@@ -35,7 +47,83 @@ export function MusicRefCard({
   const removeRef = useMusicLibraryStore((s) => s.removeRef);
   const mediaLibrary = useProjectStore((s) => s.project.mediaLibrary);
   const addMusicBed = useProjectStore((s) => s.addMusicBed);
+  const [restoring, setRestoring] = useState(false);
   const t = useT();
+
+  // Link an asset from this project's media bin, and copy its bytes into
+  // the app-global music store in the background so every other project
+  // can restore the file without a manual re-import.
+  const linkAsset = (assetId: ID) => {
+    updateRef(musicRef.id, { assetId });
+    const asset = mediaLibrary.find((a) => a.id === assetId);
+    if (!asset) return;
+    void (async () => {
+      try {
+        const blob = await readMediaFile(asset.opfsPath);
+        if (!blob) return;
+        const fileHash = await hashBlob(blob);
+        // Leased across the write→ref-commit gap so GC can't reap it.
+        const releaseStore = leaseMediaKey(musicStoreKey(fileHash));
+        try {
+          const name = safeFileName(asset.name);
+          await saveMusicFile(fileHash, new File([blob], name, { type: blob.type }));
+          updateRef(musicRef.id, { fileHash, fileName: name });
+        } finally {
+          releaseStore();
+        }
+      } catch {
+        // The project-local link still works; only cross-project restore is lost.
+      }
+    })();
+  };
+
+  // Cross-project one-click: pull the audio out of the global store,
+  // import it into THIS project's media bin, relink and lay the bed.
+  const restoreAndBed = async () => {
+    if (!musicRef.fileHash || restoring) return;
+    // Same file already in this project's bin (matched by stored name)?
+    // Relink instead of importing a duplicate copy.
+    const already = musicRef.fileName
+      ? mediaLibrary.find((a) => a.kind === "audio" && a.name === musicRef.fileName)
+      : undefined;
+    if (already) {
+      updateRef(musicRef.id, { assetId: already.id });
+      if (useProjectStore.getState().addMusicBed(already.id)) {
+        toast.success(t("music.bedAdded", { name: musicRef.title }));
+      } else {
+        toast.error(t("music.bedNoRoom"));
+      }
+      return;
+    }
+    setRestoring(true);
+    try {
+      const blob = await readMusicFile(musicRef.fileHash);
+      if (!blob) {
+        toast.error(t("music.restoreMissing"));
+        return;
+      }
+      const name = safeFileName(musicRef.fileName ?? `${musicRef.title}.mp3`);
+      const file = new File([blob], name, {
+        type: blob.type || audioMimeFor(name),
+      });
+      const { asset, releaseLease } = await importMediaFile(file);
+      try {
+        useProjectStore.getState().addMediaAsset(asset);
+      } finally {
+        releaseLease();
+      }
+      updateRef(musicRef.id, { assetId: asset.id });
+      if (useProjectStore.getState().addMusicBed(asset.id)) {
+        toast.success(t("music.bedAdded", { name: musicRef.title }));
+      } else {
+        toast.error(t("music.bedNoRoom"));
+      }
+    } catch {
+      toast.error(t("music.importFailed"));
+    } finally {
+      setRestoring(false);
+    }
+  };
 
   // The linked asset lives in the CURRENT project's media bin — in another
   // project the link simply reads as "not linked yet".
@@ -122,24 +210,45 @@ export function MusicRefCard({
               <Unlink className="size-3" />
             </button>
           </>
-        ) : audioAssets.length > 0 ? (
-          <select
-            className="max-w-40 rounded-md border border-white/10 bg-panel-1 px-1.5 py-1 text-2xs text-ink-2"
-            value=""
-            onChange={(e) => {
-              if (e.target.value) updateRef(musicRef.id, { assetId: e.target.value as ID });
-            }}
-            title={t("music.linkAssetHint")}
-          >
-            <option value="">{t("music.linkAsset")}</option>
-            {audioAssets.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
         ) : (
-          <span className="text-2xs text-ink-3">{t("music.noAudioAssets")}</span>
+          <>
+            {musicRef.fileHash && (
+              <button
+                type="button"
+                onClick={() => void restoreAndBed()}
+                disabled={restoring}
+                className="flex items-center gap-1 rounded-md bg-accent px-2 py-1 text-2xs font-medium text-accent-fg hover:bg-accent-hover disabled:opacity-50"
+              >
+                {restoring ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Music2 className="size-3" />
+                )}
+                {t("music.restoreBed")}
+              </button>
+            )}
+            {audioAssets.length > 0 ? (
+              <select
+                className="max-w-40 rounded-md border border-white/10 bg-panel-1 px-1.5 py-1 text-2xs text-ink-2"
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) linkAsset(e.target.value as ID);
+                }}
+                title={t("music.linkAssetHint")}
+              >
+                <option value="">{t("music.linkAsset")}</option>
+                {audioAssets.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              !musicRef.fileHash && (
+                <span className="text-2xs text-ink-3">{t("music.noAudioAssets")}</span>
+              )
+            )}
+          </>
         )}
         <div className="ml-auto flex gap-1">
           {musicRef.youtubeUrl && (

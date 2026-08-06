@@ -1,6 +1,7 @@
 import { readMediaFile } from "@/persistence/opfs";
 import type { MediaAsset, MediaClip, Project } from "@cut/core";
 import { hasSpeedRamp, isMediaClip, sampleKeyframeTrack, sourceOffsetForRamp } from "@cut/core";
+import { sampleVolumeCurve } from "./volume-curve";
 
 // Live audio monitoring uses a rolling schedule instead of decoding and
 // scheduling every future asset at play(). At most two decoded source buffers
@@ -224,7 +225,24 @@ class AudioEngine {
       source.playbackRate.value = clip.speed * rate;
     }
     const gain = ctx.createGain();
-    gain.gain.value = clip.volume ?? 1;
+    const volumeTrack = clip.keyframes.find((track) => track.target === "volume");
+    if (volumeTrack) {
+      // Keyframed volume (music bed fades, ducking) — rendered as a gain
+      // curve exactly like the speed ramp above, mirroring the export
+      // mixer's replace-not-multiply semantics.
+      const timelineDurationMs = timelineEndMs - timelineStartMs;
+      const samples = Math.max(2, Math.min(256, Math.ceil(timelineDurationMs / 40) + 1));
+      const curve = sampleVolumeCurve(
+        volumeTrack,
+        clip.volume ?? 1,
+        relativeStartMs,
+        relativeEndMs,
+        samples,
+      );
+      gain.gain.setValueCurveAtTime(curve, when, Math.max(0.001, timelineDurationMs / 1000 / rate));
+    } else {
+      gain.gain.value = clip.volume ?? 1;
+    }
     source.connect(gain).connect(ctx.destination);
     try {
       source.start(

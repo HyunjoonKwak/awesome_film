@@ -14,7 +14,7 @@
     "release:mac": "pnpm run build:web && electron-builder --mac --config electron-builder.yml --publish=always",
     "start": "electron .",
     "lint": "biome lint src",
-    "test": "node --test src/update-check.test.cjs"
+    "test": "node --test src/update-check.test.cjs src/music-credits.test.cjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",

@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useT } from "@/i18n/use-t";
 import { useMusicLibraryStore } from "@/stores/music-library-store";
+import { parseYoutubeCredits } from "../credits-parser";
 import { fetchYoutubeMeta, isHttpUrl, isYoutubeUrl } from "../youtube-meta";
 import type { MusicLicense } from "../types";
 
@@ -36,7 +37,26 @@ export function MusicAddForm({ onDone }: { onDone: () => void }) {
   const [moods, setMoods] = useState("");
   const [scenes, setScenes] = useState("");
   const [note, setNote] = useState("");
+  const [desc, setDesc] = useState("");
   const [fetching, setFetching] = useState(false);
+
+  // Fill the form from parsed credits (first track wins; license only when
+  // the guess is confident).
+  const applyCreditsText = (text: string): boolean => {
+    const credits = parseYoutubeCredits(text);
+    if (credits.length === 0) return false;
+    const c = credits[0]!;
+    if (c.song) setTitle(c.song);
+    if (c.artist) setArtist(c.artist);
+    if (c.licenseGuess !== "unknown") setLicense(c.licenseGuess);
+    toast.success(t("music.creditsFound", { n: credits.length }));
+    return true;
+  };
+
+  // Credits from a pasted video description — no network call.
+  const onParseCredits = () => {
+    if (!applyCreditsText(desc)) toast.error(t("music.creditsNone"));
+  };
 
   const onFetch = async () => {
     if (!isYoutubeUrl(url.trim())) {
@@ -46,13 +66,32 @@ export function MusicAddForm({ onDone }: { onDone: () => void }) {
     setFetching(true);
     try {
       const meta = await fetchYoutubeMeta(url.trim());
-      if (!meta) {
+      if (meta) {
+        setYoutubeTitle(meta.title);
+        if (!title) setTitle(meta.title);
+        if (!artist && meta.author) setArtist(meta.author);
+      } else {
         toast.error(t("music.fetchFailed"));
-        return;
       }
-      setYoutubeTitle(meta.title);
-      if (!title) setTitle(meta.title);
-      if (!artist && meta.author) setArtist(meta.author);
+      // Desktop bonus: the main process can read the watch page (no CORS)
+      // and hand back the "Music in this video" credits + description.
+      const bridge = (
+        window as unknown as {
+          cutDesktop?: { fetchMusicCredits?: (u: string) => Promise<string | null> };
+        }
+      ).cutDesktop;
+      if (bridge?.fetchMusicCredits) {
+        const text = await bridge.fetchMusicCredits(url.trim());
+        if (text) {
+          setDesc(text);
+          applyCreditsText(text);
+        }
+      }
+    } catch {
+      // IPC bridge rejection or unexpected fetch failure — the oEmbed
+      // toast (if any) already told the user; never leave an unhandled
+      // rejection behind an icon button.
+      toast.error(t("music.fetchFailed"));
     } finally {
       setFetching(false);
     }
@@ -112,6 +151,22 @@ export function MusicAddForm({ onDone }: { onDone: () => void }) {
           {t("music.fromVideo", { title: youtubeTitle })}
         </p>
       )}
+      <div className="flex gap-1.5">
+        <textarea
+          className={`${inputCls} min-h-9 resize-y`}
+          value={desc}
+          onChange={(e) => setDesc(e.target.value)}
+          placeholder={t("music.creditsPlaceholder")}
+          aria-label={t("music.creditsPlaceholder")}
+        />
+        <button
+          type="button"
+          onClick={onParseCredits}
+          className="shrink-0 self-start rounded-md border border-white/10 px-2 py-1.5 text-xs text-ink-2 hover:bg-white/10"
+        >
+          {t("music.creditsParse")}
+        </button>
+      </div>
       <input
         className={inputCls}
         value={title}
