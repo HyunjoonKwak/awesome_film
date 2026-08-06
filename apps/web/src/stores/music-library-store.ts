@@ -46,6 +46,10 @@ const sanitizeRef = (raw: unknown): MusicRef | null => {
   const assetId = optStr(r.assetId);
   const fileHash = optStr(r.fileHash);
   const fileName = optStr(r.fileName);
+  const bpm =
+    typeof r.bpm === "number" && Number.isFinite(r.bpm) && r.bpm >= 20 && r.bpm <= 400
+      ? r.bpm
+      : undefined;
   return {
     id: (optStr(r.id) ?? newId()) as ID,
     title: r.title,
@@ -61,6 +65,7 @@ const sanitizeRef = (raw: unknown): MusicRef | null => {
     ...(assetId ? { assetId: assetId as ID } : {}),
     ...(fileHash ? { fileHash } : {}),
     ...(fileName ? { fileName } : {}),
+    ...(bpm ? { bpm } : {}),
   };
 };
 

@@ -561,6 +561,8 @@ export const ko = {
     "music.recommendEmpty": "선택한 태그와 맞는 곡이 없습니다. 태그를 바꾸거나 곡을 더 저장해 보세요.",
     "music.ready": "바로 사용 가능",
     "music.durationFit": "길이 적합 {pct}%",
+    "music.tempoFit": "컷 템포 적합 {pct}%",
+    "music.fromBin": "미디어 빈에서 음원 등록 (제목·아티스트 자동 인식)",
     "music.sourceInvalid": "출처 URL이 올바르지 않습니다 (http/https만 가능)",
     "music.freeSearch": "무료 음원 검색",
     "music.freeSearchHint": "Openverse에서 상업 이용·수정 가능한 CC 음원만 검색해 바로 가져옵니다. 표기된 출처(BY) 표시는 지켜주세요.",

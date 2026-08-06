@@ -7,19 +7,11 @@ import { cn } from "@/lib/cn";
 import type { MessageKey } from "@/i18n/messages";
 import { useT } from "@/i18n/use-t";
 import { importMediaFile } from "@/media/import";
-import { leaseMediaKey } from "@/persistence/media-gc";
-import { readMediaFile } from "@/persistence/opfs";
 import { useMusicLibraryStore } from "@/stores/music-library-store";
 import { useProjectStore } from "@/stores/project-store";
 import type { ID } from "@cut/core";
-import {
-  audioMimeFor,
-  hashBlob,
-  musicStoreKey,
-  readMusicFile,
-  safeFileName,
-  saveMusicFile,
-} from "../file-store";
+import { audioMimeFor, readMusicFile, safeFileName } from "../file-store";
+import { enrichRefFromAsset } from "../link-asset";
 import type { MusicRecommendation } from "../recommend";
 import type { MusicLicense, MusicRef } from "../types";
 
@@ -50,31 +42,12 @@ export function MusicRefCard({
   const [restoring, setRestoring] = useState(false);
   const t = useT();
 
-  // Link an asset from this project's media bin, and copy its bytes into
-  // the app-global music store in the background so every other project
-  // can restore the file without a manual re-import.
+  // Link an asset from this project's media bin; the global-store copy and
+  // BPM analysis run in the background.
   const linkAsset = (assetId: ID) => {
     updateRef(musicRef.id, { assetId });
     const asset = mediaLibrary.find((a) => a.id === assetId);
-    if (!asset) return;
-    void (async () => {
-      try {
-        const blob = await readMediaFile(asset.opfsPath);
-        if (!blob) return;
-        const fileHash = await hashBlob(blob);
-        // Leased across the write→ref-commit gap so GC can't reap it.
-        const releaseStore = leaseMediaKey(musicStoreKey(fileHash));
-        try {
-          const name = safeFileName(asset.name);
-          await saveMusicFile(fileHash, new File([blob], name, { type: blob.type }));
-          updateRef(musicRef.id, { fileHash, fileName: name });
-        } finally {
-          releaseStore();
-        }
-      } catch {
-        // The project-local link still works; only cross-project restore is lost.
-      }
-    })();
+    if (asset) void enrichRefFromAsset(musicRef.id, asset);
   };
 
   // Cross-project one-click: pull the audio out of the global store,
@@ -156,8 +129,13 @@ export function MusicRefCard({
         </span>
       </div>
 
-      {(musicRef.moods.length > 0 || musicRef.scenes.length > 0) && (
+      {(musicRef.moods.length > 0 || musicRef.scenes.length > 0 || musicRef.bpm) && (
         <div className="mt-1.5 flex flex-wrap gap-1">
+          {musicRef.bpm && (
+            <span className="rounded-full bg-white/5 px-1.5 py-0.5 font-mono text-2xs text-ink-3">
+              ♩ {musicRef.bpm} BPM
+            </span>
+          )}
           {[...musicRef.moods, ...musicRef.scenes].map((tag) => (
             <span
               key={tag}
@@ -179,8 +157,13 @@ export function MusicRefCard({
           {recommendation.ready && (
             <span className="mr-2 text-emerald-300">{t("music.ready")}</span>
           )}
-          {recommendation.durationFit !== null &&
-            t("music.durationFit", { pct: Math.round(recommendation.durationFit * 100) })}
+          {recommendation.durationFit !== null && (
+            <span className="mr-2">
+              {t("music.durationFit", { pct: Math.round(recommendation.durationFit * 100) })}
+            </span>
+          )}
+          {recommendation.tempoFit !== null &&
+            t("music.tempoFit", { pct: Math.round(recommendation.tempoFit * 100) })}
         </p>
       )}
 

@@ -21,5 +21,6 @@ export interface MusicRef {
   // project restore the audio without re-importing by hand.
   readonly fileHash?: string; // SHA-256 hex of the audio bytes
   readonly fileName?: string;
+  readonly bpm?: number; // analyzed once when the audio is linked/imported
   readonly addedAt: number;
 }

@@ -76,6 +76,34 @@ describe("recommendMusic", () => {
 });
 
 describe("recommendMusic scoring edge cases", () => {
+  it("tempo fit breaks ties between otherwise equal tracks", () => {
+    const onBeat = makeRef({ title: "OnBeat", moods: ["신나는"], bpm: 120 });
+    const offBeat = makeRef({ title: "OffBeat", moods: ["신나는"], bpm: 150 });
+
+    const out = recommendMusic([offBeat, onBeat], {
+      moods: ["신나는"],
+      scenes: [],
+      targetBpm: 120,
+    });
+
+    expect(out[0]!.ref.title).toBe("OnBeat");
+    expect(out[0]!.tempoFit).toBe(1);
+    expect(out[1]!.tempoFit).toBe(0);
+  });
+
+  it("leaves tempoFit null when either side lacks a BPM", () => {
+    const noBpm = makeRef({ moods: ["신나는"] });
+
+    const withTarget = recommendMusic([noBpm], { moods: ["신나는"], scenes: [], targetBpm: 120 });
+    expect(withTarget[0]!.tempoFit).toBeNull();
+
+    const noTarget = recommendMusic([makeRef({ moods: ["신나는"], bpm: 120 })], {
+      moods: ["신나는"],
+      scenes: [],
+    });
+    expect(noTarget[0]!.tempoFit).toBeNull();
+  });
+
   it("counts a tag once when it is both a mood and a scene on one ref", () => {
     const dual = makeRef({ title: "Dual", moods: ["여행"], scenes: ["여행"] });
     const single = makeRef({ title: "Single", moods: ["여행"], scenes: [] });

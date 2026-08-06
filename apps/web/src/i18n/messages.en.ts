@@ -561,6 +561,8 @@ export const en = {
     "music.recommendEmpty": "No saved track matches those tags. Change tags or save more music.",
     "music.ready": "Ready to use",
     "music.durationFit": "Length fit {pct}%",
+    "music.tempoFit": "Cut-tempo fit {pct}%",
+    "music.fromBin": "Register from media bin (title/artist auto-detected)",
     "music.sourceInvalid": "Source URL must be http(s)",
     "music.freeSearch": "Free music search",
     "music.freeSearchHint": "Searches Openverse for CC music allowing commercial use and modification. Keep the attribution (BY) requirement.",

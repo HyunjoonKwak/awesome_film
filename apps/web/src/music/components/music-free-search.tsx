@@ -9,6 +9,7 @@ import { leaseMediaKey } from "@/persistence/media-gc";
 import { useMusicLibraryStore } from "@/stores/music-library-store";
 import { useProjectStore } from "@/stores/project-store";
 import { audioMimeFor, hashBlob, musicStoreKey, safeFileName, saveMusicFile } from "../file-store";
+import { estimateTrackBpm } from "../bpm";
 import { searchFreeMusic, type FreeTrack } from "../openverse";
 
 const inputCls =
@@ -105,7 +106,7 @@ export function MusicFreeSearch() {
         } finally {
           releaseLease();
         }
-        addRef({
+        const ref = addRef({
           title: track.title,
           license: "free",
           moods: [],
@@ -117,6 +118,12 @@ export function MusicFreeSearch() {
           fileName: name,
           ...(track.creator ? { artist: track.creator } : {}),
         });
+        // Tempo-aware recommendations — analyzed off the critical path.
+        void estimateTrackBpm(blob)
+          .then((bpm) => {
+            if (bpm) useMusicLibraryStore.getState().updateRef(ref.id, { bpm });
+          })
+          .catch(() => {});
       } finally {
         releaseStore();
       }

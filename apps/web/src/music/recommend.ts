@@ -9,6 +9,7 @@ export interface MusicQuery {
   readonly moods: readonly string[];
   readonly scenes: readonly string[];
   readonly targetMs?: number; // usually the timeline duration
+  readonly targetBpm?: number; // usually the project's cut tempo
 }
 
 export interface AssetInfo {
@@ -21,10 +22,24 @@ export interface MusicRecommendation {
   readonly matchedMoods: readonly string[];
   readonly matchedScenes: readonly string[];
   readonly durationFit: number | null; // 0..1, null when unknown
+  readonly tempoFit: number | null; // 0..1, null when unknown
   readonly ready: boolean; // has a linked asset — insertable right now
 }
 
 const norm = (s: string): string => s.trim().toLowerCase();
+
+// How well a track's BPM pairs with the project's cut tempo. Half- and
+// double-time relationships count as matches (cutting every 2nd/4th beat
+// is just as musical); fit decays linearly over a ±20 BPM window.
+export const bpmFit = (trackBpm: number, targetBpm: number): number => {
+  if (trackBpm <= 0 || targetBpm <= 0) return 0;
+  let best = 0;
+  for (const multiple of [0.5, 1, 2]) {
+    const diff = Math.abs(trackBpm * multiple - targetBpm);
+    best = Math.max(best, Math.max(0, 1 - diff / 20));
+  }
+  return best;
+};
 
 export const recommendMusic = (
   refs: readonly MusicRef[],
@@ -44,11 +59,12 @@ export const recommendMusic = (
       asset && query.targetMs && query.targetMs > 0
         ? Math.max(0, Math.min(1, asset.durationMs / query.targetMs))
         : null;
+    const tempoFit = ref.bpm && query.targetBpm ? bpmFit(ref.bpm, query.targetBpm) : null;
     // Count each distinct tag once even when it appears as both a mood and
     // a scene on the same ref — no double scoring.
     const matchedKeys = new Set([...matchedMoods, ...matchedScenes].map(norm));
-    const score = matchedKeys.size * 2 + (ready ? 1 : 0) + (durationFit ?? 0);
-    return { ref, score, matchedMoods, matchedScenes, durationFit, ready };
+    const score = matchedKeys.size * 2 + (ready ? 1 : 0) + (durationFit ?? 0) + (tempoFit ?? 0);
+    return { ref, score, matchedMoods, matchedScenes, durationFit, tempoFit, ready };
   });
 
   const kept = tagged

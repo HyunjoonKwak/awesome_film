@@ -4,8 +4,13 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useT } from "@/i18n/use-t";
+import { readMediaFile } from "@/persistence/opfs";
 import { useMusicLibraryStore } from "@/stores/music-library-store";
+import { useProjectStore } from "@/stores/project-store";
+import type { ID, MediaAsset } from "@cut/core";
 import { parseYoutubeCredits } from "../credits-parser";
+import { readAudioTags } from "../id3";
+import { enrichRefFromAsset } from "../link-asset";
 import { fetchYoutubeMeta, isHttpUrl, isYoutubeUrl } from "../youtube-meta";
 import type { MusicLicense } from "../types";
 
@@ -27,7 +32,11 @@ const inputCls =
 
 export function MusicAddForm({ onDone }: { onDone: () => void }) {
   const addRef = useMusicLibraryStore((s) => s.addRef);
+  const audioAssets = useProjectStore((s) => s.project.mediaLibrary).filter(
+    (a) => a.kind === "audio",
+  );
   const t = useT();
+  const [pendingAsset, setPendingAsset] = useState<MediaAsset | null>(null);
   const [url, setUrl] = useState("");
   const [youtubeTitle, setYoutubeTitle] = useState("");
   const [title, setTitle] = useState("");
@@ -56,6 +65,27 @@ export function MusicAddForm({ onDone }: { onDone: () => void }) {
   // Credits from a pasted video description — no network call.
   const onParseCredits = () => {
     if (!applyCreditsText(desc)) toast.error(t("music.creditsNone"));
+  };
+
+  // Register one of the user's own audio files: ID3 tags fill title/artist
+  // (local parse, no service), and saving links + enriches the asset.
+  const onPickAsset = (asset: MediaAsset) => {
+    setPendingAsset(asset);
+    if (!title) setTitle(asset.name.replace(/\.[a-z0-9]+$/i, ""));
+    void (async () => {
+      const blob = await readMediaFile(asset.opfsPath);
+      if (!blob) return;
+      const tags = await readAudioTags(blob);
+      // A slow tag read must not clobber a newer selection or the user's
+      // typing — apply only while this asset is still the pending one.
+      setPendingAsset((current) => {
+        if (current?.id === asset.id) {
+          if (tags.title) setTitle(tags.title);
+          if (tags.artist) setArtist(tags.artist);
+        }
+        return current;
+      });
+    })();
   };
 
   const onFetch = async () => {
@@ -110,7 +140,10 @@ export function MusicAddForm({ onDone }: { onDone: () => void }) {
     }
     // Only a validated YouTube URL is worth storing as one.
     const ytUrl = isYoutubeUrl(url.trim()) ? url.trim() : "";
-    addRef({
+    // The asset may have been deleted from the bin while the form was open.
+    const liveAsset =
+      pendingAsset && audioAssets.some((a) => a.id === pendingAsset.id) ? pendingAsset : null;
+    const ref = addRef({
       title: trimmedTitle,
       license,
       moods: parseTags(moods),
@@ -120,7 +153,9 @@ export function MusicAddForm({ onDone }: { onDone: () => void }) {
       ...(ytUrl ? { youtubeUrl: ytUrl } : {}),
       ...(youtubeTitle ? { youtubeTitle } : {}),
       ...(note.trim() ? { note: note.trim() } : {}),
+      ...(liveAsset ? { assetId: liveAsset.id } : {}),
     });
+    if (liveAsset) void enrichRefFromAsset(ref.id, liveAsset);
     toast.success(t("music.saved"));
     onDone();
   };
@@ -128,6 +163,26 @@ export function MusicAddForm({ onDone }: { onDone: () => void }) {
   return (
     <div className="flex flex-col gap-2 border-b border-white/5 bg-panel-1 p-3">
       <p className="text-2xs text-ink-3">{t("music.addHint")}</p>
+      {audioAssets.length > 0 && (
+        <select
+          className="rounded-md border border-white/10 bg-panel-2 px-2 py-1.5 text-xs text-ink-2"
+          value={pendingAsset?.id ?? ""}
+          onChange={(e) => {
+            const picked = audioAssets.find((a) => a.id === e.target.value);
+            // Re-selecting the placeholder cancels the pending link.
+            if (picked) onPickAsset(picked);
+            else setPendingAsset(null);
+          }}
+          aria-label={t("music.fromBin")}
+        >
+          <option value="">{t("music.fromBin")}</option>
+          {audioAssets.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
+          ))}
+        </select>
+      )}
       <div className="flex gap-1.5">
         <input
           className={inputCls}

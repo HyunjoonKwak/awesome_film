@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Music2, Plus, X } from "lucide-react";
 import { useT } from "@/i18n/use-t";
 import { useMusicLibraryStore } from "@/stores/music-library-store";
+import { useProjectStore } from "@/stores/project-store";
 import { MusicAddForm } from "./music-add-form";
 import { MusicFreeSearch } from "./music-free-search";
 import { MusicRecommend } from "./music-recommend";
@@ -11,6 +12,7 @@ import { MusicRefCard } from "./music-ref-card";
 
 export function MusicPanel() {
   const refs = useMusicLibraryStore((s) => s.refs);
+  const projectId = useProjectStore((s) => s.project.id);
   const [adding, setAdding] = useState(false);
   const t = useT();
 
@@ -31,7 +33,8 @@ export function MusicPanel() {
         </button>
       </div>
       {adding && <MusicAddForm onDone={() => setAdding(false)} />}
-      <MusicRecommend />
+      {/* Remount on project switch so the context-tag preselection follows. */}
+      <MusicRecommend key={projectId} />
       <MusicFreeSearch />
       <div className="flex flex-col gap-2 p-3">
         {refs.length === 0 && !adding && <p className="text-xs text-ink-3">{t("music.empty")}</p>}

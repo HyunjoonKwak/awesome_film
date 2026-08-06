@@ -6,7 +6,9 @@ import { cn } from "@/lib/cn";
 import { useT } from "@/i18n/use-t";
 import { useMusicLibraryStore } from "@/stores/music-library-store";
 import { useProjectStore } from "@/stores/project-store";
+import { projectContextText, suggestTagsFromText } from "../context-tags";
 import { collectAllTags, collectTags, recommendMusic } from "../recommend";
+import { projectCutBpm } from "../tempo";
 import { MusicRefCard } from "./music-ref-card";
 
 const MAX_RESULTS = 5;
@@ -14,8 +16,22 @@ const MAX_RESULTS = 5;
 export function MusicRecommend() {
   const refs = useMusicLibraryStore((s) => s.refs);
   const mediaLibrary = useProjectStore((s) => s.project.mediaLibrary);
+  // Subscribe to tracks + duration, NOT the timeline object — playback
+  // replaces the timeline every frame (playhead), and re-ranking at 60fps
+  // while the tab is open would be pure waste.
+  const tracks = useProjectStore((s) => s.project.timeline.tracks);
   const targetMs = useProjectStore((s) => s.project.timeline.duration);
-  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  // Preselect tags the project already talks about (name, markers, titles)
+  // — an initial suggestion only; every chip stays user-toggleable.
+  const [selected, setSelected] = useState<ReadonlySet<string>>(
+    () =>
+      new Set(
+        suggestTagsFromText(
+          projectContextText(useProjectStore.getState().project),
+          collectAllTags(useMusicLibraryStore.getState().refs),
+        ),
+      ),
+  );
   const t = useT();
 
   const tags = useMemo(() => collectTags(refs), [refs]);
@@ -25,13 +41,23 @@ export function MusicRecommend() {
         .filter((a) => a.kind === "audio")
         .map((a) => [a.id, { durationMs: a.durationMs }]),
     );
-    const pick = (pool: readonly string[]) => pool.filter((tag) => selected.has(tag));
+    // Chips come from collectAllTags (deduped across pools) while pick()
+    // filters each pool — compare normalized so "Calm" matches "calm".
+    const selectedKeys = new Set([...selected].map((s) => s.trim().toLowerCase()));
+    const pick = (pool: readonly string[]) =>
+      pool.filter((tag) => selectedKeys.has(tag.trim().toLowerCase()));
+    const targetBpm = projectCutBpm(tracks);
     return recommendMusic(
       refs,
-      { moods: pick(tags.moods), scenes: pick(tags.scenes), targetMs },
+      {
+        moods: pick(tags.moods),
+        scenes: pick(tags.scenes),
+        targetMs,
+        ...(targetBpm !== null ? { targetBpm } : {}),
+      },
       assets,
     ).slice(0, MAX_RESULTS);
-  }, [refs, mediaLibrary, targetMs, selected, tags]);
+  }, [refs, mediaLibrary, tracks, targetMs, selected, tags]);
 
   if (refs.length === 0) return null;
   const allTags = collectAllTags(refs);
