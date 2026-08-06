@@ -1,7 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Activity, Clapperboard, FileText, MapPin, ShieldCheck, Sliders, Wand2 } from "lucide-react";
+import {
+  Activity,
+  Clapperboard,
+  FileText,
+  MapPin,
+  Music2,
+  ShieldCheck,
+  Sliders,
+  Wand2,
+} from "lucide-react";
 import { cn } from "@/lib/cn";
 import { AutoEditPanel } from "@/autoedit/components/autoedit-panel";
 import { InspectorPanel } from "./inspector-panel";
@@ -9,10 +18,11 @@ import { SubtitlePanel } from "@/subtitles/subtitle-panel";
 import { ScopesPanel } from "@/preview/scopes-panel";
 import { MulticamPanel } from "./multicam-panel";
 import { MarkerPanel } from "./marker-panel";
+import { MusicPanel } from "@/music/components/music-panel";
 import { ProjectInspectorPanel } from "./project-inspector-panel";
 import { useT } from "@/i18n/use-t";
 
-type Tab = "inspector" | "auto" | "subs" | "scopes" | "multicam" | "markers" | "inspect";
+type Tab = "inspector" | "auto" | "subs" | "music" | "scopes" | "multicam" | "markers" | "inspect";
 
 export function RightPanel() {
   const [tab, setTab] = useState<Tab>("inspector");
@@ -20,7 +30,7 @@ export function RightPanel() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex border-b border-white/5">
+      <div className="flex overflow-hidden border-b border-white/5">
         <TabButton
           active={tab === "inspector"}
           onClick={() => setTab("inspector")}
@@ -38,6 +48,12 @@ export function RightPanel() {
           onClick={() => setTab("subs")}
           icon={<FileText className="size-3.5" />}
           label={t("subs.tab")}
+        />
+        <TabButton
+          active={tab === "music"}
+          onClick={() => setTab("music")}
+          icon={<Music2 className="size-3.5" />}
+          label={t("music.tab")}
         />
         <TabButton
           active={tab === "scopes"}
@@ -68,6 +84,7 @@ export function RightPanel() {
         {tab === "inspector" && <InspectorPanel />}
         {tab === "auto" && <AutoEditPanel />}
         {tab === "subs" && <SubtitlePanel />}
+        {tab === "music" && <MusicPanel />}
         {tab === "scopes" && <ScopesPanel />}
         {tab === "multicam" && <MulticamPanel />}
         {tab === "markers" && <MarkerPanel />}
@@ -77,7 +94,7 @@ export function RightPanel() {
   );
 }
 
-// Icon-only tabs — six labels don't fit a ~300px panel without wrapping.
+// Icon-only tabs — eight labels don't fit a ~300px panel without wrapping.
 // The label lives in the tooltip/aria-label, and the active tab shows it
 // inline since the active state frees up the most attention.
 function TabButton({
@@ -98,10 +115,8 @@ function TabButton({
       title={label}
       aria-label={label}
       className={cn(
-        "flex flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-2 text-2xs transition",
-        active
-          ? "border-accent text-ink-1"
-          : "border-transparent text-ink-3 hover:text-ink-1",
+        "flex min-w-0 flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-2 text-2xs transition",
+        active ? "border-accent text-ink-1" : "border-transparent text-ink-3 hover:text-ink-1",
       )}
     >
       {icon}

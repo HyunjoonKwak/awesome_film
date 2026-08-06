@@ -69,6 +69,7 @@ import { createEffectActions } from "./actions/effect-actions";
 import { createKeyframeActions } from "./actions/keyframe-actions";
 import { createMarkerActions } from "./actions/marker-actions";
 import { createMediaActions } from "./actions/media-actions";
+import { createMusicActions } from "./actions/music-actions";
 import { type PlaceMode, createPlaceAssetActions } from "./actions/place-asset-actions";
 import { createTrackActions } from "./actions/track-actions";
 import { runWith } from "./store-helpers";
@@ -138,6 +139,7 @@ interface ProjectStoreState {
   toggleTrackSolo: (trackId: ID) => void;
   addClipToTrack: (trackId: ID, clip: Clip) => void;
   placeAsset: (asset: MediaAsset, mode: PlaceMode) => void;
+  addMusicBed: (assetId: ID) => boolean;
   removeClipById: (clipId: ID) => void;
   removeClipsById: (clipIds: readonly ID[]) => void;
   rippleDeleteById: (clipId: ID) => void;
@@ -278,6 +280,7 @@ export const useProjectStore = create<ProjectStoreState>()(
       })),
 
     ...createMediaActions(set),
+    ...createMusicActions(set),
     ...createPlaceAssetActions(set),
     ...createTrackActions(set),
     ...createMarkerActions(set),
